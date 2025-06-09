@@ -299,13 +299,13 @@ const onCellEditComplete = (event: any) => {
             >
               <div>
                 <DataTable
-                  :value="resultData"
+                  :value="approvalData.data"
                   scrollable
                   scrollHeight="400px"
                   striped-rows
                   removableSort
                   :filters="filters"
-                  :globalFilterFields="resultColumns.map((c) => c.field)"
+                  :globalFilterFields="approvalColumns.map((c) => c.field)"
                   class="!w-auto pt-0"
                   edit-mode="cell"
                   @cell-edit-complete="onCellEditComplete"
@@ -339,7 +339,7 @@ const onCellEditComplete = (event: any) => {
                     </template>
                   </Column>
                   <Column
-                    v-for="col in resultColumns"
+                    v-for="col in approvalColumns"
                     :key="col.field"
                     :field="col.field"
                     :header="col.header"
