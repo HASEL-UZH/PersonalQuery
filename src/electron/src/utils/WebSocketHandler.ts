@@ -4,7 +4,7 @@ export interface Meta {
   tables: string[];
   activities: string[];
   query: string;
-  result: string;
+  result: Record<string, any>[];
 }
 
 export type Role = 'system' | 'ai' | 'human';
@@ -21,7 +21,7 @@ export function useChatWebSocket() {
   const steps = ref<string[]>([]);
   const isConnected = ref(false);
   const onFinalResponse = ref<(() => void) | null>(null);
-  const approvalRequest = ref<{ data: string; chat_id: string } | null>(null);
+  const approvalRequest = ref<{ data: Record<string, any>[]; chat_id: string } | null>(null);
 
   const connect = () => {
     socket.value = new WebSocket('ws://localhost:8000/ws');

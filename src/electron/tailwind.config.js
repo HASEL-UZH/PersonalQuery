@@ -3,7 +3,7 @@ import colors from 'tailwindcss/colors';
 
 module.exports = {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  plugins: [require('@tailwindcss/typography'), require('daisyui')],
+  plugins: [require('@tailwindcss/typography'), require('daisyui'), require('tailwindcss-primeui')],
   theme: {
     extend: {
       colors: {

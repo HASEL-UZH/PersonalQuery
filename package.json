@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@primevuelab/themes": "^1.0.0",
+    "katex": "^0.16.22",
+    "marked": "^15.0.12",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.3.5",
+    "tailwindcss-primeui": "^0.6.1"
+  },
+  "devDependencies": {
+    "postcss-import": "^16.1.0"
+  }
+}

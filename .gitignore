@@ -91,3 +91,5 @@ src/py-backend/backend.log
 /src/py-backend/build
 /src/py-backend/dist
 
+/node_modules
+/src/electron/src/styles/primevue

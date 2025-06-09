@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue';
+import { ref, onMounted, watch, nextTick, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { marked } from 'marked';
 import { Meta, Message, useChatWebSocket } from '../utils/WebSocketHandler';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import markedKatex from 'marked-katex-extension';
+import { FilterMatchMode } from '@primevue/core/api';
+import InputText from 'primevue/inputtext';
 
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);
@@ -19,19 +24,32 @@ const {
 
 interface Approval {
   chat_id: string;
-  data: string;
+  data: Record<string, any>[];
 }
 
+marked.use(markedKatex({ throwOnError: false }));
+
 function formatMessage(message: string) {
+  console.log(message);
   return marked.parse(message);
 }
+
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
+
+const globalSearch = ref('');
+
+watch(globalSearch, (newVal) => {
+  filters.value.global.value = newVal;
+});
 
 const metaDialog = ref<HTMLDialogElement | null>(null);
 const currentMeta = ref<Meta>({
   tables: [],
   activities: [],
   query: '',
-  result: ''
+  result: []
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
@@ -186,6 +204,43 @@ function respondToApproval(approval: boolean) {
     steps.value = ['generate answer'];
   }
 }
+
+const resultData = computed(() => {
+  return Array.isArray(currentMeta.value.result) ? currentMeta.value.result : [];
+});
+
+const resultColumns = computed(() => {
+  const firstRow = resultData.value[0];
+  if (!firstRow) return [];
+  return Object.keys(firstRow).map((key) => ({
+    field: key,
+    header: formatHeader(key)
+  }));
+});
+
+const approvalColumns = computed(() => {
+  const firstRow = approvalData.value?.data?.[0];
+  if (!firstRow) return [];
+  return Object.keys(firstRow).map((key) => ({
+    field: key,
+    header: formatHeader(key)
+  }));
+});
+
+function formatHeader(key: string): string {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+}
+
+const onCellEditComplete = (event: any) => {
+  const { data, newValue, field } = event;
+
+  if (newValue?.trim?.() === '') {
+    event.preventDefault();
+    return;
+  }
+
+  data[field] = newValue;
+};
 </script>
 
 <template>
@@ -213,7 +268,7 @@ function respondToApproval(approval: boolean) {
         <!-- AI message -->
         <div v-else-if="msg.role === 'ai'" class="mb-4 flex w-full justify-center px-4">
           <div
-            class="prose prose-base mx-auto w-full max-w-4xl rounded-lg border border-white/10 px-6 py-5 text-left text-base-content"
+            class="prose mx-auto w-full max-w-4xl rounded-lg border border-white/10 px-6 py-5 text-left leading-tight text-base-content"
           >
             <div v-html="formatMessage(msg.content)" />
             <button
@@ -239,10 +294,68 @@ function respondToApproval(approval: boolean) {
             </p>
 
             <div
+              v-if="approvalData && approvalData.data && approvalData.data.length"
               class="overflow-y-auto rounded bg-base-200 p-4 text-sm"
-              style="max-height: 300px"
-              v-html="formatMessage(approvalData?.data || 'No preview available.')"
-            ></div>
+            >
+              <div>
+                <DataTable
+                  :value="resultData"
+                  scrollable
+                  scrollHeight="400px"
+                  striped-rows
+                  removableSort
+                  :filters="filters"
+                  :globalFilterFields="resultColumns.map((c) => c.field)"
+                  class="!w-auto pt-0"
+                  edit-mode="cell"
+                  @cell-edit-complete="onCellEditComplete"
+                  :pt="{
+                    table: { style: 'min-width: 50rem' },
+                    column: {
+                      bodycell: ({ state }) => ({
+                        class: [{ '!py-0': state['d_editing'] }]
+                      })
+                    }
+                  }"
+                >
+                  <template #header>
+                    <div
+                      class="custom-datatable-header flex items-center justify-between gap-4 pr-0"
+                    >
+                      <span class="ml-auto">
+                        <input
+                          v-model="globalSearch"
+                          type="text"
+                          placeholder="Search for values..."
+                          class="input input-sm input-bordered w-full max-w-xs"
+                        />
+                      </span>
+                    </div>
+                  </template>
+
+                  <Column header="#" :style="{ whiteSpace: 'nowrap', width: '0.1%' }">
+                    <template #body="{ index }">
+                      {{ index + 1 }}
+                    </template>
+                  </Column>
+                  <Column
+                    v-for="col in resultColumns"
+                    :key="col.field"
+                    :field="col.field"
+                    :header="col.header"
+                    sortable
+                    :style="{ whiteSpace: 'nowrap', width: '1%' }"
+                    :editable="true"
+                  >
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" :autofocus="true" fluid />
+                    </template>
+                  </Column>
+                </DataTable>
+              </div>
+            </div>
+
+            <div v-else class="p-4 text-sm text-gray-500">No preview available.</div>
 
             <div class="mt-4 flex justify-end gap-4">
               <button class="btn btn-outline btn-sm" @click="respondToApproval(false)">No</button>
@@ -257,7 +370,6 @@ function respondToApproval(approval: boolean) {
 
     <form @submit.prevent="sendMessage" class="w-full">
       <div class="space-y-4 rounded border border-base-300 bg-base-200 p-4">
-        <!-- ✅ Full-width input -->
         <input
           v-model="input"
           class="input input-bordered w-full"
@@ -265,15 +377,12 @@ function respondToApproval(approval: boolean) {
         />
 
         <div class="flex w-full flex-wrap items-start gap-6">
-          <!-- ✅ Left side group: Toggle + Slider -->
           <div class="flex items-start gap-6">
-            <!-- Auto Approve -->
             <div class="flex flex-col items-start">
               <input type="checkbox" class="toggle toggle-primary" v-model="autoApprove" />
               <span class="label-text mt-1 text-xs">Auto Approve</span>
             </div>
 
-            <!-- Slider -->
             <div class="flex flex-col items-start">
               <input
                 id="top_k"
@@ -289,7 +398,6 @@ function respondToApproval(approval: boolean) {
             </div>
           </div>
 
-          <!-- ✅ Send button on far right -->
           <div class="ml-auto self-start">
             <button class="btn btn-primary" type="submit">Send</button>
           </div>
@@ -299,7 +407,7 @@ function respondToApproval(approval: boolean) {
 
     <!-- Info Modal -->
     <dialog ref="metaDialog" class="modal">
-      <div class="modal-box w-[90vw] max-w-none">
+      <div class="modal-box h-[90vh] w-[90vw] max-w-none">
         <div class="mb-4 flex items-start justify-between">
           <h3 class="text-lg font-bold">Details</h3>
           <button class="btn btn-circle btn-ghost btn-sm" @click="closeMetaModal" title="Close">
@@ -323,13 +431,47 @@ function respondToApproval(approval: boolean) {
 </pre
             >
           </div>
-          <div>
+          <div v-if="resultData.length > 0" class="inline-block min-w-[500px]">
             <p class="font-semibold">Result:</p>
-            <div
-              class="prose prose-sm max-w-none overflow-x-auto overflow-y-auto rounded bg-base-200 p-4 text-sm"
-              style="max-height: 300px"
-              v-html="formatMessage(currentMeta.result ?? '')"
-            ></div>
+            <DataTable
+              :value="resultData"
+              scrollable
+              scrollHeight="400px"
+              striped-rows
+              removableSort
+              :filters="filters"
+              :globalFilterFields="resultColumns.map((c) => c.field)"
+              class="!w-auto min-w-max pt-1"
+            >
+              <template #header>
+                <div
+                  class="custom-datatable-header flex items-center justify-between gap-4 p-2 pr-0"
+                >
+                  <span class="ml-auto">
+                    <input
+                      v-model="globalSearch"
+                      type="text"
+                      placeholder="Search for values..."
+                      class="input input-sm input-bordered w-full max-w-xs"
+                    />
+                  </span>
+                </div>
+              </template>
+
+              <Column header="#" :style="{ whiteSpace: 'nowrap', width: '0.1%' }">
+                <template #body="{ index }">
+                  {{ index + 1 }}
+                </template>
+              </Column>
+              <Column
+                v-for="col in resultColumns"
+                :key="col.field"
+                :field="col.field"
+                :header="col.header"
+                sortable
+                :style="{ whiteSpace: 'nowrap', padding: '0.75rem 1rem', width: '1%' }"
+              />
+            </DataTable>
           </div>
         </div>
       </div>
@@ -355,5 +497,20 @@ function respondToApproval(approval: boolean) {
   padding-left: 1.2rem;
   list-style: disc;
   margin-bottom: 0.5rem;
+}
+
+::v-deep(.katex .katex-html) {
+  display: none !important;
+}
+
+::v-deep(.p-datatable td),
+::v-deep(.p-datatable tr),
+::v-deep(.p-datatable tr),
+::v-deep(.p-datatable th) {
+  border-color: var(--bc); /* Example: Tailwind gray-300 */
+}
+::v-deep(.p-datatable-header) {
+  padding-bottom: 0;
+  border-bottom: var(--bc); /* Tailwind gray-300 or your custom color */
 }
 </style>
