@@ -30,16 +30,8 @@ def classify_chain(llm: ChatOpenAI):
     )
 
 
-def classify_question_old(state: State) -> State:
-    """For LangGraph Orchestration"""
-    llm = LLMRegistry.get("openai")
-    branch = classify_chain(llm).invoke(state)
-    state['branch'] = branch
-    return state
-
-
 def classify_question(state: State) -> State:
-    llm = LLMRegistry.get("openai")
+    llm = LLMRegistry.get("openai-mini")
     prompt = prompt_template.invoke(state['question'])
     system_prompt = prompt.messages[0].content
 
@@ -62,10 +54,11 @@ def strip_outer_quotes(text: str) -> str:
 
 def generate_title(state: State) -> State:
     """For LangGraph Orchestration"""
-    llm = LLMRegistry.get("openai-high-temp")
+    llm = LLMRegistry.get("openai-mini")
     prompt: ChatPromptValue = prompt_template_title.invoke({
         "question": state["question"],
-        "max_characters": 15
+        "max_characters": 15,
+        "current_time": state['current_time']
     })
 
     raw_title = llm.invoke(prompt.to_string()).content

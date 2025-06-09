@@ -24,7 +24,7 @@ def extract_activities(state: State) -> State:
     if "window_activity" not in state["tables"]:
         return state
 
-    llm = LLMRegistry.get("openai")
+    llm = LLMRegistry.get("openai-mini")
     activities = activity_chain(llm).invoke(state)
     state["activities"] = activities
     return state
