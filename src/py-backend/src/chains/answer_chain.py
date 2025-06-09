@@ -1,3 +1,5 @@
+import re
+
 from langchain import hub
 from langchain_core.messages import AIMessage, AIMessageChunk, SystemMessage
 from langchain_core.prompt_values import ChatPromptValue
@@ -13,6 +15,11 @@ prompt_template_summarize = hub.pull("summarize_answers")
 
 prompt_template = hub.pull("generate_answer")
 prompt_template_general = hub.pull("general_answer")
+
+
+def convert_bracket_to_dollar_latex(text: str) -> str:
+    """Replaces LaTeX math blocks with $$ $$ for frontend display compatibility."""
+    return re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
 
 
 def answer_chain(llm: ChatOpenAI, state: State):
@@ -62,10 +69,12 @@ def generate_answer(state: State) -> State:
         })
         response = llm.invoke(prompt).content
 
-    state["answer"] = response
+    formatted_response = convert_bracket_to_dollar_latex(response)
+
+    state["answer"] = formatted_response
 
     messages.append(AIMessage(
-        content=response,
+        content=formatted_response,
         additional_kwargs={
             "meta": {
                 "tables": state["tables"],

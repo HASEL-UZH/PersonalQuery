@@ -19,7 +19,7 @@ session_template = hub.pull("session")
 def get_custom_table_info(state: State) -> str:
     prompt_parts = []
     tables = state["tables"]
-    activities = state.get("activities", None)
+    activities = state.get("activities")
 
     for table in tables:
         if table == "session":
@@ -65,7 +65,7 @@ def write_query(state: State) -> State:
 
 def execute_query(state: State) -> State:
     raw_result = db._execute(state["query"])
-    state["raw_result"] = format_result_as_markdown(raw_result)
+    state["raw_result"] = raw_result
 
     chunks = split_result(raw_result)
     state["result"] = [format_result_as_markdown(chunk) for chunk in chunks]
