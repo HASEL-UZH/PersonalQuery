@@ -1,9 +1,8 @@
-from typing import List, Literal, Optional, Callable
+from typing import List
 
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict, Annotated
-from langchain_core.messages import BaseMessage, FunctionMessage
+from langchain_core.messages import BaseMessage
 
 
 class State(TypedDict):

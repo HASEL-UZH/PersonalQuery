@@ -100,7 +100,7 @@ def general_answer(state: State) -> State:
     else:
         temp_messages.insert(0, SystemMessage(content=system_prompt))
 
-    response = llm.invoke(messages).content
+    response = llm.invoke(temp_messages).content
     state["answer"] = response
     messages.append(AIMessage(content=response))
     return state

@@ -85,12 +85,13 @@ async def handle_approval(request: Request):
     payload = await request.json()
     chat_id = payload.get("chat_id")
     approval = payload.get("approval")
+    data = payload.get("data")
 
     if not isinstance(approval, bool):
         return {"status": "error", "message": "Missing or invalid 'approval' boolean."}
 
     if approval:
-        msg = resume_stream(chat_id)
+        msg = resume_stream(chat_id, data)
         return msg
     else:
         return {}

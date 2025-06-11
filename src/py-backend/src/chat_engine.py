@@ -21,6 +21,7 @@ from chains.context_chain import give_context
 from helper.chat_utils import title_exists, give_correct_step
 from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
 from helper.env_loader import load_env
+from helper.result_utils import format_result_as_markdown
 from schemas import State
 from llm_registry import LLMRegistry
 
@@ -207,9 +208,10 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_approve=False, o
     return final_msg
 
 
-def resume_stream(chat_id: str) -> Dict:
+def resume_stream(chat_id: str, data) -> Dict:
     config = {"configurable": {"thread_id": chat_id}}
     final_msg = {}
+    graph.update_state(config, {'raw_result': data, 'result': [format_result_as_markdown(data)]})
 
     try:
         for step in graph.stream(None, config, stream_mode="updates"):

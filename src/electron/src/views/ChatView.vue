@@ -172,12 +172,16 @@ onFinalResponse.value = async () => {
     });
 };
 
-const sendApproval = async (chatId: string, approval: boolean) => {
+const sendApproval = async (chatId: string, approval: boolean, data: any) => {
   try {
     const res = await fetch('http://localhost:8000/approval', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, approval })
+      body: JSON.stringify({
+        chat_id: chatId,
+        approval,
+        data: data
+      })
     });
 
     const result = await res.json();
@@ -196,7 +200,7 @@ const sendApproval = async (chatId: string, approval: boolean) => {
 
 function respondToApproval(approval: boolean) {
   if (approvalData.value?.chat_id) {
-    sendApproval(approvalData.value.chat_id, approval);
+    sendApproval(approvalData.value.chat_id, approval, approvalData.value.data);
   }
   needsApproval.value = false;
   approvalData.value = null;
@@ -295,7 +299,7 @@ const onCellEditComplete = (event: any) => {
 
             <div
               v-if="approvalData && approvalData.data && approvalData.data.length"
-              class="overflow-y-auto rounded bg-base-200 p-4 text-sm"
+              class="overflow-y-auto rounded bg-base-100 p-4 text-sm"
             >
               <div>
                 <DataTable
@@ -347,8 +351,28 @@ const onCellEditComplete = (event: any) => {
                     :style="{ whiteSpace: 'nowrap', width: '1%' }"
                     :editable="true"
                   >
+                    <template #body="slotProps">
+                      <span
+                        :title="slotProps.data[col.field]"
+                        style="
+                          display: inline-block;
+                          max-width: 200px;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                          white-space: nowrap;
+                          vertical-align: bottom;
+                        "
+                      >
+                        {{ slotProps.data[col.field] }}
+                      </span>
+                    </template>
                     <template #editor="{ data, field }">
-                      <InputText v-model="data[field]" :autofocus="true" fluid />
+                      <InputText
+                        v-model="data[field]"
+                        :autofocus="true"
+                        fluid
+                        :style="{ width: '100%' }"
+                      />
                     </template>
                   </Column>
                 </DataTable>

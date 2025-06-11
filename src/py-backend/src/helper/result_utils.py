@@ -1,4 +1,5 @@
 import math
+from typing import List, Any
 
 
 def escape_md_cell(value: str) -> str:
