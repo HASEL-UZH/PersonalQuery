@@ -14,12 +14,11 @@ from langgraph.graph.graph import CompiledGraph
 
 from chains.activity_chain import extract_activities
 from chains.answer_chain import generate_answer, general_answer
-from chains.query_chain import write_query, execute_query
+from chains.query_chain import write_query, execute_query, check_query_adjustment
 from chains.table_chain import get_tables
 from chains.init_chain import classify_question, generate_title
 from chains.context_chain import give_context
 from helper.chat_utils import title_exists, give_correct_step
-from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown
 from schemas import State
@@ -87,26 +86,31 @@ def initialize():
         extract_activities,
         write_query,
         execute_query,
-        generate_answer
+        generate_answer,
     ])
 
     graph_builder.add_node("general_answer", general_answer)
     graph_builder.add_edge("general_answer", END)
+
+    graph_builder.add_node("check_query_adjustment", check_query_adjustment)
 
     graph_builder.add_conditional_edges(
         "classify_question",
         lambda s: (
             "generate_title" if s["branch"] == "data_query" and not s.get("title_exist", False)
             else "give_context" if s["branch"] == "data_query"
+            else "check_query_adjustment" if s["branch"] == "follow_up"
             else "general_answer"
         ),
         {
             "generate_title": "generate_title",
             "give_context": "give_context",
+            "check_query_adjustment": "check_query_adjustment",
             "general_answer": "general_answer"
         }
     )
 
+    graph_builder.add_edge("check_query_adjustment", "give_context")
     graph_builder.add_edge("generate_title", "give_context")
 
     conn = sqlite3.connect(str(CHECKPOINT_DB_PATH), check_same_thread=False)
@@ -123,7 +127,7 @@ def initialize():
     """)
 
 
-async def run_chat(question: str, chat_id: str, top_k=150, auto_approve=False, on_update=None) -> Dict:
+async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_approve=False, on_update=None) -> Dict:
     """Main chat execution."""
     now = datetime.now(UTC).isoformat()
     conn = sqlite3.connect(str(CHECKPOINT_DB_PATH), check_same_thread=False)
@@ -173,7 +177,9 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_approve=False, o
         "raw_result": "",
         "result": [],
         "answer": "",
-        "top_k": top_k
+        "top_k": top_k,
+        "last_query": get_last_query(chat_id),
+        "adjust_query": False
     }
 
     interrupt_nodes = [] if auto_approve else ["generate_answer"]
@@ -196,7 +202,7 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_approve=False, o
     answer = state['messages'][-1]
     final_msg = {"role": "ai", "content": answer.content, "additional_kwargs": answer.additional_kwargs}
 
-    if branch == 'data_query' and not auto_approve:
+    if branch != "general_qa" and not auto_approve:
         if on_update:
             await on_update({
                 "type": "approval",
@@ -231,7 +237,6 @@ def resume_stream(chat_id: str, data) -> Dict:
 
 def get_chat_history(chat_id: str) -> Dict:
     config = {"configurable": {"thread_id": chat_id}}
-
     try:
         snapshot = graph.get_state(config)
         messages = snapshot.values.get("messages", [])
@@ -247,6 +252,23 @@ def get_chat_history(chat_id: str) -> Dict:
             result.append({"role": "system", "content": msg.content})
 
     return {"messages": result}
+
+def get_last_query(chat_id: str):
+    config = {"configurable": {"thread_id": chat_id}}
+    try:
+        snapshot = graph.get_state(config)
+        messages = snapshot.values.get("messages", [])
+        last_ai_msg = next((m for m in reversed(messages) if isinstance(m, AIMessage)), None)
+    except Exception:
+        return {"error": "Chat not found"}
+
+    if last_ai_msg is None:
+        return None
+
+    meta = last_ai_msg.additional_kwargs.get("meta", {})
+    query = meta.get("query")
+    return query
+
 
 
 def delete_chat(chat_id: str):

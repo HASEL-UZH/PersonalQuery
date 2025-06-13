@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 from typing import Dict, List
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.prompt_values import ChatPromptValue
 from langgraph.graph.graph import CompiledGraph
 
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
@@ -121,3 +122,14 @@ def give_correct_step(current_node: str, branch: str, title_exist: bool = False)
     }
 
     return data_query_map.get(current_node, current_node)
+
+
+def replace_or_insert_system_prompt(messages: list, prompt: ChatPromptValue) -> list:
+    """Replace the first system message or insert one at the beginning if none exists."""
+    system_prompt = prompt.messages[0].content
+    messages_copy = messages.copy()
+    if messages_copy and isinstance(messages_copy[0], SystemMessage):
+        messages_copy[0] = SystemMessage(content=system_prompt)
+    else:
+        messages_copy.insert(0, SystemMessage(content=system_prompt))
+    return messages_copy

@@ -37,12 +37,13 @@ async def websocket_chat(websocket: WebSocket):
             question = data.get("question", "")
             chat_id = data.get("chat_id", "1")
             top_k = data.get("top_k", 150)
+            auto_sql = data.get("auto_sql", True)
             auto_approve = data.get("auto_approve", False)
 
             async def on_update(update: dict):
                 await websocket.send_json(update)
 
-            msg = await run_chat(question, chat_id, top_k, auto_approve, on_update=on_update)
+            msg = await run_chat(question, chat_id, top_k, auto_sql, auto_approve, on_update=on_update)
             if msg:
                 await websocket.send_json(msg)
 
@@ -95,6 +96,16 @@ async def handle_approval(request: Request):
         return msg
     else:
         return {}
+
+
+@app.post("/adjust-query")
+async def adjust_query(request: Request):
+    payload = await request.json()
+    chat_id = payload.get("chat_id")
+    query = payload.get("query")
+    adjusted_query = payload.get("adjusted_query")
+    response = payload.get("response")
+
 
 @app.post("/initialize-data")
 def initialize_data():

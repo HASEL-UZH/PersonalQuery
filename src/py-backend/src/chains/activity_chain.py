@@ -23,6 +23,8 @@ def activity_chain(llm: ChatOpenAI):
 def extract_activities(state: State) -> State:
     if "window_activity" not in state["tables"]:
         return state
+    if not state["adjust_query"] and state["branch"] == "follow_up":
+        return state
 
     llm = LLMRegistry.get("openai")
     activities = activity_chain(llm).invoke(state)

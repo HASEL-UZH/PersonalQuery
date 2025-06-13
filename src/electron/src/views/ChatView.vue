@@ -393,7 +393,7 @@ const onCellEditComplete = (event: any) => {
     </div>
 
     <form @submit.prevent="sendMessage" class="w-full">
-      <div class="space-y-4 rounded border border-base-300 bg-base-200 p-4">
+      <div class="space-y-4 rounded border border-base-300 bg-base-200 p-3">
         <input
           v-model="input"
           class="input input-bordered w-full"
@@ -401,29 +401,93 @@ const onCellEditComplete = (event: any) => {
         />
 
         <div class="flex w-full flex-wrap items-start gap-6">
-          <div class="flex items-start gap-6">
+          <!-- Privacy Container -->
+          <div class="flex w-fit items-start gap-4 rounded-lg border border-white/10 p-2">
+            <div class="flex items-center gap-1">
+              <!-- Privacy icon -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-shield-check-icon lucide-shield-check h-5 w-5"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span class="text-sm font-medium">Consent</span>
+            </div>
             <div class="flex flex-col items-start">
               <input type="checkbox" class="toggle toggle-primary" v-model="autoApprove" />
-              <span class="label-text mt-1 text-xs">Auto Approve</span>
-            </div>
-
-            <div class="flex flex-col items-start">
-              <input
-                id="top_k"
-                type="range"
-                min="0"
-                max="1500"
-                step="50"
-                v-model.number="topK"
-                class="range"
-                style="width: 250px"
-              />
-              <span class="label-text mt-1 text-xs">Limit Results to: {{ topK }}</span>
+              <div
+                class="tooltip"
+                data-tip="Allow the system to automatically approve and send sensitive data."
+              >
+                <span class="label-text mt-1 text-xs">Auto Approve</span>
+              </div>
             </div>
           </div>
 
-          <div class="ml-auto self-start">
-            <button class="btn btn-primary" type="submit">Send</button>
+          <!-- SQL Options Container -->
+          <div class="flex w-fit items-start gap-4 rounded-lg border border-white/10 p-2">
+            <div class="flex items-center gap-1">
+              <!-- SQL icon -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-database-icon lucide-database h-5 w-5"
+              >
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+                <path d="M3 12A9 3 0 0 0 21 12" />
+              </svg>
+              <span class="text-sm font-medium">SQL</span>
+            </div>
+            <div class="flex flex-row items-start">
+              <div class="flex flex-col items-start">
+                <input
+                  id="top_k"
+                  type="range"
+                  min="0"
+                  max="500"
+                  step="50"
+                  v-model.number="topK"
+                  class="range"
+                  style="width: 250px"
+                />
+                <span class="label-text mt-1 text-xs">Limit Results: {{ topK }}</span>
+              </div>
+
+              <!-- Optional: Add SQL Auto-Approve toggle here -->
+              <div class="ml-4 flex flex-col items-start">
+                <input type="checkbox" class="toggle toggle-primary" v-model="autoApproveSQL" />
+                <div
+                  class="tooltip"
+                  data-tip="Automatically approve and run generated SQL queries without manual review."
+                >
+                  <span class="label-text mt-1 text-xs">Auto SQL</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="ml-auto flex items-center self-stretch">
+            <button class="text-md btn btn-primary h-full" type="submit">Send</button>
           </div>
         </div>
       </div>
@@ -431,15 +495,16 @@ const onCellEditComplete = (event: any) => {
 
     <!-- Info Modal -->
     <dialog ref="metaDialog" class="modal">
-      <div class="modal-box h-[90vh] w-[90vw] max-w-none">
-        <div class="mb-4 flex items-start justify-between">
+      <div class="modal-box h-[90vh] w-[90vw] max-w-[80%] p-0 flex flex-col">
+        <!-- Sticky Header -->
+        <div class="sticky top-0 z-10 flex items-start justify-between px-6 py-4 ">
           <h3 class="text-lg font-bold">Details</h3>
           <button class="btn btn-circle btn-ghost btn-sm" @click="closeMetaModal" title="Close">
             ✕
           </button>
         </div>
 
-        <div v-if="currentMeta" class="space-y-4">
+        <div v-if="currentMeta" class="overflow-y-auto px-6 py-4 space-y-4 flex-1">
           <div>
             <p class="font-semibold">Tables:</p>
             <p class="text-sm">{{ currentMeta.tables?.join(', ') ?? '' }}</p>
@@ -455,7 +520,7 @@ const onCellEditComplete = (event: any) => {
 </pre
             >
           </div>
-          <div v-if="resultData.length > 0" class="inline-block min-w-[500px]">
+          <div v-if="resultData.length > 0" class="inline-block max-w-[100%]">
             <p class="font-semibold">Result:</p>
             <DataTable
               :value="resultData"
@@ -465,7 +530,7 @@ const onCellEditComplete = (event: any) => {
               removableSort
               :filters="filters"
               :globalFilterFields="resultColumns.map((c) => c.field)"
-              class="!w-auto min-w-max pt-1"
+              class="!w-auto pt-1"
             >
               <template #header>
                 <div
@@ -493,8 +558,24 @@ const onCellEditComplete = (event: any) => {
                 :field="col.field"
                 :header="col.header"
                 sortable
-                :style="{ whiteSpace: 'nowrap', padding: '0.75rem 1rem', width: '1%' }"
-              />
+                :style="{ whiteSpace: 'nowrap', width: '1%' }"
+              >
+                <template #body="slotProps">
+                  <span
+                    :title="slotProps.data[col.field]"
+                    style="
+                      display: inline-block;
+                      max-width: 200px;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      vertical-align: bottom;
+                    "
+                  >
+                    {{ slotProps.data[col.field] }}
+                  </span>
+                </template>
+              </Column>
             </DataTable>
           </div>
         </div>

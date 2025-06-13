@@ -1,9 +1,9 @@
-import re
-
 from langchain import hub
-from langchain_core.messages import AIMessage, AIMessageChunk, SystemMessage
+from langchain_core.messages import AIMessage
 from langchain_core.prompt_values import ChatPromptValue
 
+from helper.answer_utils import convert_bracket_to_dollar_latex
+from helper.chat_utils import replace_or_insert_system_prompt
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry
 from schemas import State
@@ -14,12 +14,12 @@ prompt_template_partial = hub.pull("partial_answer")
 prompt_template_summarize = hub.pull("summarize_answers")
 
 prompt_template = hub.pull("generate_answer")
+diagnostic_template = hub.pull("answer-diagnostic")
+predictive_template = hub.pull("answer-predictive")
+prescriptive_template = hub.pull("answer-prescriptive")
+descriptive_template = hub.pull("answer-descriptive")
+
 prompt_template_general = hub.pull("general_answer")
-
-
-def convert_bracket_to_dollar_latex(text: str) -> str:
-    """Replaces LaTeX math blocks with $$ $$ for frontend display compatibility."""
-    return re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
 
 
 def answer_chain(llm: ChatOpenAI, state: State):
@@ -39,35 +39,27 @@ def generate_answer(state: State) -> State:
     """For LangGraph Orchestration"""
     llm = LLMRegistry.get("openai")
     messages = state["messages"]
+    insight_mode = state["insight_mode"]
 
-    if len(state["result"]) == 1:
-        prompt: ChatPromptValue = prompt_template.invoke({
-            "question": state["question"],
-            "result": state["result"],
-            "current_time": state["current_time"]
-        })
-        response = llm.invoke(prompt.to_string()).content
+    if insight_mode == "diagnostic":
+        template = diagnostic_template
+    elif insight_mode == "predictive":
+        template = predictive_template
+    elif insight_mode == "prescriptive":
+        template = prescriptive_template
     else:
-        summaries = []
+        template = descriptive_template
 
-        for i, chunk_markdown in enumerate(state["result"]):
-            prompt: ChatPromptValue = prompt_template_partial.invoke({
-                "question": state["question"],
-                "result": chunk_markdown
-            })
-            response = llm.invoke(prompt).content
-            summaries.append(response)
-            messages.append(AIMessageChunk(content=response))
-
-        joined_summaries = "\n\n".join(
-            f"Chunk {i + 1}:\n{summary}" for i, summary in enumerate(summaries)
-        )
-
-        prompt: ChatPromptValue = prompt_template_summarize.invoke({
-            "question": state["question"],
-            "summaries": joined_summaries,
-        })
-        response = llm.invoke(prompt).content
+    prompt: ChatPromptValue = template.invoke({
+        "question": state["question"],
+        "result": state["result"],
+        "current_time": state["current_time"]
+    })
+    if state['branch'] == "follow_up":
+        temp_messages = replace_or_insert_system_prompt(messages, prompt)
+        response = llm.invoke(temp_messages).content
+    else:
+        response = llm.invoke(prompt.to_string()).content
 
     formatted_response = convert_bracket_to_dollar_latex(response)
 
@@ -89,16 +81,10 @@ def generate_answer(state: State) -> State:
 
 def general_answer(state: State) -> State:
     prompt = prompt_template_general.invoke(state['current_time'])
-    system_prompt = prompt.messages[0].content
 
     llm = LLMRegistry.get("openai-high-temp")
     messages = state["messages"]
-    temp_messages = messages.copy()
-
-    if temp_messages and isinstance(temp_messages[0], SystemMessage):
-        temp_messages[0] = SystemMessage(content=system_prompt)
-    else:
-        temp_messages.insert(0, SystemMessage(content=system_prompt))
+    temp_messages = replace_or_insert_system_prompt(messages, prompt)
 
     response = llm.invoke(temp_messages).content
     state["answer"] = response

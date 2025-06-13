@@ -23,6 +23,8 @@ def table_chain(llm: ChatOpenAI) -> RunnableSequence[State, list[str]]:
 
 def get_tables(state: State) -> State:
     """For LangGraph Orchestration"""
+    if not state["adjust_query"] and state["branch"] == "follow_up":
+        return state
     llm = LLMRegistry.get("openai")
     tables = table_chain(llm).invoke(state)
     state['tables'] = tables

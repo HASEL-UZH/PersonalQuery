@@ -42,7 +42,8 @@ def classify_question(state: State) -> State:
         temp_messages.insert(0, SystemMessage(content=system_prompt))
 
     parsed = llm.with_structured_output(QuestionType).invoke(temp_messages)
-    state['branch'] = parsed["questionType"]
+    state['branch'] = parsed.questionType
+    state['insight_mode'] = parsed.insightMode
     return state
 
 
