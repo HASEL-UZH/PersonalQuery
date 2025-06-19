@@ -53,7 +53,7 @@ def generate_answer(state: State) -> State:
     prompt: ChatPromptValue = template.invoke({
         "question": state["question"],
         "result": state["result"],
-        "current_time": state["current_time"]
+        "query": state["query"],
     })
     if state['branch'] == "follow_up":
         temp_messages = replace_or_insert_system_prompt(messages, prompt)
@@ -72,7 +72,8 @@ def generate_answer(state: State) -> State:
                 "tables": state["tables"],
                 "activities": state["activities"],
                 "query": state["query"],
-                "result": state["raw_result"]
+                "result": state["raw_result"],
+                "plotPath": state['plot_path']
             }
         }
     ))

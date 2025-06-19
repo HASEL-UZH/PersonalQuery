@@ -21,6 +21,12 @@ class Activity(BaseModel):
     name: str = Field(description="Activity label to use in SQL filtering.")
 
 
+class WantsPlot(str, Enum):
+    YES = "YES"
+    NO = "NO"
+    AUTO = "AUTO"
+
+
 class QuestionType(BaseModel):
     questionType: Literal["data_query", "general_qa", "follow_up"] = Field(
         ..., description="Type of question in order to decide what actions to take."
@@ -29,6 +35,9 @@ class QuestionType(BaseModel):
         "descriptive", "diagnostic", "predictive", "prescriptive"
     ] = Field(
         ..., description="The analytical intent behind the user's question."
+    )
+    wantsPlot: WantsPlot = Field(
+        ..., description="Whether the user expects a visual (yes), does not (no), or lets the assistant decide (auto)."
     )
 
 
@@ -101,6 +110,17 @@ class QueryScope(BaseModel):
     )
 
 
+class PlotOption(BaseModel):
+    wantsPlot: WantsPlot = Field(
+        ..., description="Whether the user expects a visual (yes), does not (no)"
+    )
+
+
+class PythonOutput(TypedDict):
+    """Generated SQL query"""
+    code: Annotated[str, ..., "Syntactically valid python code to create visualizations."]
+
+
 class State(TypedDict):
     thread_id: str
     messages: List[BaseMessage]
@@ -120,3 +140,9 @@ class State(TypedDict):
     adjust_query: bool
     aggregation_feature: Optional[List[AggregationFeature]]
     time_scope: TimeScope
+    wants_plot: WantsPlot
+    plot_code: str
+    plot_path: str
+    plot_base64: str
+    plot_error: str | None
+    plot_attempts: int

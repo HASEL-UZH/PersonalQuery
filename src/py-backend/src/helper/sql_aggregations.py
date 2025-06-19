@@ -25,7 +25,7 @@ SELECT
   activity,
   processName,
   windowTitle,
-  SUM(durationInSeconds) AS total_focus_time
+  SUM(durationInSeconds) AS total_focus_time_in_s
 FROM window_activity
 WHERE {time_filter}
 GROUP BY activity, processName, windowTitle

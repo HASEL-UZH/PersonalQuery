@@ -134,3 +134,17 @@ def replace_or_insert_system_prompt(messages: list, prompt: ChatPromptValue) -> 
     else:
         messages_copy.insert(0, SystemMessage(content=system_prompt))
     return messages_copy
+
+
+def replace_or_insert_last_human_msg(messages: list, question: str) -> list:
+    """Replace the last HumanMessage in the list with a new one containing the given question.
+    If no HumanMessage is found, append the new one to the end.
+    """
+    messages_copy = messages.copy()
+    for i in range(len(messages_copy) - 1, -1, -1):
+        if isinstance(messages_copy[i], HumanMessage):
+            messages_copy[i] = HumanMessage(content=question)
+            return messages_copy
+    messages_copy.append(HumanMessage(content=question))
+    return messages_copy
+

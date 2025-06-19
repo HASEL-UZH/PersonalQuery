@@ -14,6 +14,7 @@ from langgraph.graph.graph import CompiledGraph
 
 from chains.activity_chain import extract_activities
 from chains.answer_chain import generate_answer, general_answer
+from chains.plot_chain import is_suitable_for_plot, create_py_plot_code, execute_py_code
 from chains.query_chain import write_query, execute_query, check_query_adjustment
 from chains.scope_chain import get_scope
 from chains.table_chain import get_tables
@@ -22,7 +23,7 @@ from chains.context_chain import give_context
 from helper.chat_utils import title_exists, give_correct_step
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown
-from schemas import State
+from schemas import State, WantsPlot
 from llm_registry import LLMRegistry
 
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
@@ -81,37 +82,91 @@ def initialize():
     graph_builder.add_edge(START, "classify_question")
 
     graph_builder.add_sequence([
-        give_context,
         get_tables,
         extract_activities,
         get_scope,
         write_query,
         execute_query,
-        generate_answer,
     ])
 
     graph_builder.add_node("general_answer", general_answer)
     graph_builder.add_edge("general_answer", END)
 
     graph_builder.add_node("check_query_adjustment", check_query_adjustment)
+    graph_builder.add_node("give_context", give_context)
+    graph_builder.add_node("is_suitable_for_plot", is_suitable_for_plot)
+    graph_builder.add_node("create_py_plot_code", create_py_plot_code)
+    graph_builder.add_node("execute_py_code", execute_py_code)
+    graph_builder.add_node("generate_answer", generate_answer)
+
+    graph_builder.add_conditional_edges(
+        "give_context",
+        lambda s: (
+            "get_tables" if s["branch"] == "data_query"
+            else "check_query_adjustment"
+        ),
+        {
+            "get_tables": "get_tables",
+            "check_query_adjustment": "check_query_adjustment"
+        }
+    )
 
     graph_builder.add_conditional_edges(
         "classify_question",
         lambda s: (
             "generate_title" if s["branch"] == "data_query" and not s.get("title_exist", False)
-            else "give_context" if s["branch"] == "data_query"
-            else "check_query_adjustment" if s["branch"] == "follow_up"
+            else "give_context" if s["branch"] != "general_qa"
             else "general_answer"
         ),
         {
             "generate_title": "generate_title",
             "give_context": "give_context",
-            "check_query_adjustment": "check_query_adjustment",
             "general_answer": "general_answer"
         }
     )
 
-    graph_builder.add_edge("check_query_adjustment", "give_context")
+    graph_builder.add_conditional_edges(
+        "execute_query",
+        lambda s: (
+            "create_py_plot_code" if s.get("wants_plot") == WantsPlot.YES
+            else "is_suitable_for_plot" if s.get("wants_plot") == WantsPlot.AUTO
+            else "generate_answer"
+        ),
+        {
+            "create_py_plot_code": "create_py_plot_code",
+            "is_suitable_for_plot": "is_suitable_for_plot",
+            "generate_answer": "generate_answer"
+        }
+    )
+
+    graph_builder.add_conditional_edges(
+        "is_suitable_for_plot",
+        lambda s: (
+            "create_py_plot_code" if s.get("wants_plot") != WantsPlot.NO
+            else "generate_answer"
+        ),
+        {
+            "create_py_plot_code": "create_py_plot_code",
+            "generate_answer": "generate_answer"
+        }
+    )
+
+    graph_builder.add_edge("create_py_plot_code", "execute_py_code")
+
+    graph_builder.add_conditional_edges(
+        "execute_py_code",
+        lambda s: (
+            "create_py_plot_code"
+            if s.get("plot_error") and s.get("plot_attempts", 0) < 3
+            else "generate_answer"
+        ),
+        {
+            "create_py_plot_code": "create_py_plot_code",
+            "generate_answer": "generate_answer"
+        }
+    )
+
+    graph_builder.add_edge("check_query_adjustment", "get_tables")
     graph_builder.add_edge("generate_title", "give_context")
 
     conn = sqlite3.connect(str(CHECKPOINT_DB_PATH), check_same_thread=False)
@@ -183,12 +238,12 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_
         "adjust_query": False
     }
 
-    interrupt_nodes = [] if auto_approve else ["generate_answer"]
+    interrupt_nodes = [] if auto_approve else ["execute_query"]
 
     if on_update:
         await on_update({"type": "step", "node": "classify question"})
 
-    for step in graph.stream(state, config, stream_mode="updates", interrupt_before=interrupt_nodes):
+    for step in graph.stream(state, config, stream_mode="updates", interrupt_after=interrupt_nodes):
         node_name = list(step.keys())[0]
         if node_name == "execute_query":
             data = step[node_name].get("raw_result")

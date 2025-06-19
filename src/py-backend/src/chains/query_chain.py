@@ -2,7 +2,6 @@ from langchain import hub
 from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 from database import get_db
-from helper.chat_utils import replace_or_insert_system_prompt
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown, split_result
 from helper.sql_aggregations import aggregation_sql_templates
@@ -63,10 +62,7 @@ def check_query_adjustment(state: State) -> State:
         "last_query": state["last_query"]
     })
 
-    messages = state["messages"].copy()
-    temp_messages = replace_or_insert_system_prompt(messages, prompt)
-
-    parsed = llm.with_structured_output(AdjustQueryDecision).invoke(temp_messages)
+    parsed = llm.with_structured_output(AdjustQueryDecision).invoke(prompt)
     state["adjust_query"] = parsed.adjust
     return state
 
@@ -75,11 +71,11 @@ def group_based_on_time_scope(ts: TimeScope):
     if ts == ts.session:
         return ""
     if ts == ts.day:
-        return "NOTE: Try to group by sessions/hours."
+        return "**Try to group by hours.**"
     if ts == ts.week:
-        return "NOTE: Try to group by days."
+        return "**Try to group by days.**"
     if ts == ts.month:
-        return "NOTE: Try to group by weeks"
+        return "**Try to group by weeks.**"
 
 
 def query_chain(llm: ChatOpenAI):
@@ -90,7 +86,7 @@ def query_chain(llm: ChatOpenAI):
 
         if aggregation_features:
             aggregation_hint = (
-                    "- You can use the following aggregation SQL templates to help write your query:\n\n"
+                    "- Use the following aggregation SQL templates to help write your query:\n\n"
                     + "\n\n---\n\n".join(
                 f"-- Feature: {feature}\n{aggregation_template_map[feature]}"
                 for feature in aggregation_features
@@ -139,6 +135,7 @@ def query_chain(llm: ChatOpenAI):
 def write_query(state: State) -> State:
     """For LangGraph Orchestration"""
     if not state["adjust_query"] and state["branch"] == "follow_up":
+        state["query"] = state["last_query"]
         return state
     llm = LLMRegistry.get("openai")
     query = query_chain(llm).invoke(state)
