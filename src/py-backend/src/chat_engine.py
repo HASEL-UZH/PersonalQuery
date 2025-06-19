@@ -15,6 +15,7 @@ from langgraph.graph.graph import CompiledGraph
 from chains.activity_chain import extract_activities
 from chains.answer_chain import generate_answer, general_answer
 from chains.query_chain import write_query, execute_query, check_query_adjustment
+from chains.scope_chain import get_scope
 from chains.table_chain import get_tables
 from chains.init_chain import classify_question, generate_title
 from chains.context_chain import give_context
@@ -31,8 +32,7 @@ DB_PATH = APPDATA_PATH / "personal-query" / "database.sqlite"
 graph: CompiledGraph
 checkpointer: SqliteSaver
 
-logging.basicConfig(level=logging.INFO)  # Ensure logging works even if not set up yet
-logging.info(f"👀 chat_engine.py loaded in PID: {os.getpid()}")
+logging.basicConfig(level=logging.INFO)
 
 
 def initialize():
@@ -84,6 +84,7 @@ def initialize():
         give_context,
         get_tables,
         extract_activities,
+        get_scope,
         write_query,
         execute_query,
         generate_answer,
@@ -253,6 +254,7 @@ def get_chat_history(chat_id: str) -> Dict:
 
     return {"messages": result}
 
+
 def get_last_query(chat_id: str):
     config = {"configurable": {"thread_id": chat_id}}
     try:
@@ -268,7 +270,6 @@ def get_last_query(chat_id: str):
     meta = last_ai_msg.additional_kwargs.get("meta", {})
     query = meta.get("query")
     return query
-
 
 
 def delete_chat(chat_id: str):

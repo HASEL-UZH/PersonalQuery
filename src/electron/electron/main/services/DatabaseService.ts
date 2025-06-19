@@ -107,7 +107,7 @@ export class DatabaseService {
 
   private async runDataInit() {
     try {
-      const res = await fetch('http://localhost:8000/initialize-data', {
+      const res = await fetch('http://127.0.0.1:8000/initialize-data', {
         method: 'POST'
       });
 
@@ -115,7 +115,7 @@ export class DatabaseService {
         const errorText = await res.text();
         LOG.error('Backend returned error during cleanup:', errorText);
       } else {
-        LOG.info('Database cleanup via Python backend completed.');
+        LOG.info('Database modification via Python backend completed.');
       }
     } catch (e) {
       LOG.error('Failed to reach Python backend for cleanup:', e);

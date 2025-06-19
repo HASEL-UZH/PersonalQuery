@@ -108,7 +108,7 @@ def title_exists(thread_id: str) -> bool:
 
 def give_correct_step(current_node: str, branch: str, title_exist: bool = False) -> str:
     """Predict the next logical step in the workflow based on branch and current node."""
-    if branch != "data_query":
+    if branch == "general_qa":
         return "generate_answer"
 
     data_query_map = {
@@ -116,7 +116,8 @@ def give_correct_step(current_node: str, branch: str, title_exist: bool = False)
         "generate_title": "give_context",
         "give_context": "get_tables",
         "get_tables": "extract_activities",
-        "extract_activities": "write_query",
+        "extract_activities": "get_scope",
+        "get_scope": "write_query",
         "write_query": "execute_query",
         "execute_query": "generate_answer"
     }

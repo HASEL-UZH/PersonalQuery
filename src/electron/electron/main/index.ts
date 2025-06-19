@@ -16,7 +16,7 @@ import { WindowService } from './services/WindowService';
 import { IpcHandler } from '../ipc/IpcHandler';
 import { ExperienceSamplingService } from './services/ExperienceSamplingService';
 import studyConfig from '../../shared/study.config';
-import { is } from './services/utils/helpers';
+import { is, waitForBackendReady } from './services/utils/helpers';
 import { Settings } from './entities/Settings';
 import { UsageDataService } from './services/UsageDataService';
 import { UsageDataEventType } from '../enums/UsageDataEventType.enum';
@@ -131,6 +131,7 @@ app.whenReady().then(async () => {
   }
 
   try {
+    await waitForBackendReady();
     await databaseService.checkAndImportOldDataBase();
     await databaseService.init();
     await workScheduleService.init();

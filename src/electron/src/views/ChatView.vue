@@ -27,14 +27,14 @@ interface Approval {
   data: Record<string, any>[];
 }
 
-marked.use(markedKatex({ throwOnError: false }));
+marked.use(markedKatex());
 
 function formatMessage(message: string) {
   console.log(message);
   return marked.parse(message);
 }
 
-const filters = ref({
+const filters = ref<{ global: { value: string | null; matchMode: string } }>({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
 
@@ -53,6 +53,7 @@ const currentMeta = ref<Meta>({
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
+const autoApproveSQL = ref(false);
 const topK = ref(150);
 const STORAGE_KEY = 'chat_settings';
 
@@ -245,6 +246,12 @@ const onCellEditComplete = (event: any) => {
 
   data[field] = newValue;
 };
+
+function tableBodyCell({ state }: { state: Record<string, any> }) {
+  return {
+    class: [{ '!py-0': state['d_editing'] }]
+  };
+}
 </script>
 
 <template>
@@ -316,9 +323,7 @@ const onCellEditComplete = (event: any) => {
                   :pt="{
                     table: { style: 'min-width: 50rem' },
                     column: {
-                      bodycell: ({ state }) => ({
-                        class: [{ '!py-0': state['d_editing'] }]
-                      })
+                      bodycell: tableBodyCell
                     }
                   }"
                 >
@@ -495,16 +500,16 @@ const onCellEditComplete = (event: any) => {
 
     <!-- Info Modal -->
     <dialog ref="metaDialog" class="modal">
-      <div class="modal-box h-[90vh] w-[90vw] max-w-[80%] p-0 flex flex-col">
+      <div class="modal-box flex h-[90vh] w-[90vw] max-w-[80%] flex-col p-0">
         <!-- Sticky Header -->
-        <div class="sticky top-0 z-10 flex items-start justify-between px-6 py-4 ">
+        <div class="sticky top-0 z-10 flex items-start justify-between px-6 py-4">
           <h3 class="text-lg font-bold">Details</h3>
           <button class="btn btn-circle btn-ghost btn-sm" @click="closeMetaModal" title="Close">
             ✕
           </button>
         </div>
 
-        <div v-if="currentMeta" class="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+        <div v-if="currentMeta" class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
           <div>
             <p class="font-semibold">Tables:</p>
             <p class="text-sm">{{ currentMeta.tables?.join(', ') ?? '' }}</p>

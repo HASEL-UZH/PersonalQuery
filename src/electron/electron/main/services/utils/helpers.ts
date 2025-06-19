@@ -24,3 +24,21 @@ export function generateAlphaNumericString(length: number = 0): string {
   }
   return result;
 }
+
+export async function waitForBackendReady(timeout = 60000, interval = 250): Promise<void> {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/health', { method: 'GET' });
+      if (res.ok) {
+        return;
+      }
+    } catch (e) {
+      // Backend not ready yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+
+  throw new Error(`Backend did not become ready within ${timeout} ms`);
+}

@@ -12,7 +12,7 @@ from helper.db_modification import update_sessions_from_usage_data, add_window_a
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
-    logging.info("✅ Backend shutting down")
+    logging.info("Backend shutting down")
 
 
 initialize()
@@ -20,7 +20,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["http://localhost:5173"] for dev if needed
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -115,3 +115,8 @@ def initialize_data():
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

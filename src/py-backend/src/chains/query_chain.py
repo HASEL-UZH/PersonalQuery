@@ -5,11 +5,11 @@ from database import get_db
 from helper.chat_utils import replace_or_insert_system_prompt
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown, split_result
+from helper.sql_aggregations import aggregation_sql_templates
 from llm_registry import LLMRegistry
-from schemas import State, QueryOutput, AdjustQueryDecision
+from schemas import State, QueryOutput, AdjustQueryDecision, TimeScope
 
 load_env()
-db = get_db()
 
 main_template = hub.pull("sql-query-system-prompt")
 
@@ -24,6 +24,11 @@ session_template = hub.pull("session")
 
 adjust_query_decision_template = hub.pull("adjust-query-decision")
 adjust_query_template = hub.pull("adjust-query")
+
+aggregation_template_map = {
+    item["feature"]: item["sql_template"]
+    for item in aggregation_sql_templates
+}
 
 
 def get_custom_table_info(state: State) -> str:
@@ -66,17 +71,45 @@ def check_query_adjustment(state: State) -> State:
     return state
 
 
+def group_based_on_time_scope(ts: TimeScope):
+    if ts == ts.session:
+        return ""
+    if ts == ts.day:
+        return "NOTE: Try to group by sessions/hours."
+    if ts == ts.week:
+        return "NOTE: Try to group by days."
+    if ts == ts.month:
+        return "NOTE: Try to group by weeks"
+
+
 def query_chain(llm: ChatOpenAI):
     def select_template(state: State):
         insight_mode = state.get('insight_mode', "descriptive")
         update = state.get('adjust_query', False)
+        aggregation_features = state.get("aggregation_feature")
+
+        if aggregation_features:
+            aggregation_hint = (
+                    "- You can use the following aggregation SQL templates to help write your query:\n\n"
+                    + "\n\n---\n\n".join(
+                f"-- Feature: {feature}\n{aggregation_template_map[feature]}"
+                for feature in aggregation_features
+                if feature in aggregation_template_map
+            )
+            )
+        else:
+            aggregation_hint = ""
+
+        group_by = group_based_on_time_scope(state.get('time_scope', TimeScope.day))
         if update:
             return adjust_query_template.invoke({
-                "dialect": db.dialect,
+                "dialect": "sqlite",
                 "top_k": state.get('top_k', 150),
-                "table_info": get_custom_table_info(state) if state["tables"] else db.get_table_info(),
+                "table_info": get_custom_table_info(state),
                 "question": state["question"],
-                "last_query": state["last_query"]
+                "last_query": state["last_query"],
+                "aggregation_hint": aggregation_hint,
+                "group_by": group_by
             })
         if insight_mode == "diagnostic":
             template = diagnostic_template
@@ -88,16 +121,18 @@ def query_chain(llm: ChatOpenAI):
             template = descriptive_template
 
         return template.invoke({
-            "dialect": db.dialect,
+            "dialect": "sqlite",
             "top_k": state.get('top_k', 150),
-            "table_info": get_custom_table_info(state) if state["tables"] else db.get_table_info(),
-            "question": state["question"]
+            "table_info": get_custom_table_info(state),
+            "question": state["question"],
+            "aggregation_hint": aggregation_hint,
+            "group_by": group_by
         })
 
     return (
-        RunnableLambda(lambda state: select_template(state))
-        | llm.with_structured_output(QueryOutput)
-        | (lambda parsed: parsed["query"])
+            RunnableLambda(lambda state: select_template(state))
+            | llm.with_structured_output(QueryOutput)
+            | (lambda parsed: parsed["query"])
     )
 
 
@@ -112,6 +147,7 @@ def write_query(state: State) -> State:
 
 
 def execute_query(state: State) -> State:
+    db = get_db()
     raw_result = db._execute(state["query"])
     state["raw_result"] = raw_result
 
