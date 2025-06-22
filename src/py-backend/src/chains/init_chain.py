@@ -59,7 +59,7 @@ def generate_title(state: State) -> State:
     llm = LLMRegistry.get("openai")
     prompt: ChatPromptValue = prompt_template_title.invoke({
         "question": state["question"],
-        "max_characters": 15,
+        "max_characters": 25,
         "current_time": state['current_time']
     })
 

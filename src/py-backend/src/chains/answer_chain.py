@@ -6,7 +6,7 @@ from helper.answer_utils import convert_bracket_to_dollar_latex
 from helper.chat_utils import replace_or_insert_system_prompt
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry
-from schemas import State
+from schemas import State, WantsPlot
 from langchain_openai import ChatOpenAI
 
 load_env()
@@ -51,10 +51,16 @@ async def generate_answer(state: State, config: dict) -> State:
     else:
         template = descriptive_template
 
+    if state['wants_plot'] != WantsPlot.NO:
+        plot = "- A plot has been created and will be displayed after your message."
+    else:
+        plot = ""
+
     prompt: ChatPromptValue = template.invoke({
         "question": state["question"],
         "result": state["result"],
         "query": state["query"],
+        "plot": plot
     })
 
     if state['branch'] == "follow_up":

@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-
+import platform
 from langchain import hub
 
 from helper.env_loader import load_env
@@ -12,6 +12,10 @@ import os
 import uuid
 import base64
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import matplotlib.font_manager as fm
+
 
 load_env()
 prompt_template_auto = hub.pull("auto-plot-decision")
@@ -47,12 +51,12 @@ def create_py_plot_code(state: State):
     if attempts == 0:
         prompt = prompt_template_create.invoke({
             "question": state['question'],
-            "result": state['result'],
+            "result": state['raw_result'][:10],
         })
     else:
         prompt = prompt_template_create_again.invoke({
             "question": state['question'],
-            "result": state['result'],
+            "result": state['raw_result'][:10],
             "prev_code": state['plot_code'],
             "prev_error": state['plot_error']
         })
@@ -78,14 +82,43 @@ def execute_py_code(state: State) -> State:
         state["plot_error"] = "SAVE_PATH found, but not used with plt.savefig(...)"
         return state
 
-    # Step 1: Remove SAVE_PATH assignment if it exists
     code = re.sub(r"SAVE_PATH\s*=\s*['\"].*?['\"]", "", code)
-
-    # Step 2: Replace all uses of SAVE_PATH with the actual path
     code = code.replace("SAVE_PATH", f"r'{str(full_path)}'")
+
+    # Strip dummy data and df definitions
+    code = re.sub(
+        r"(?s)\w+_data\s*=\s*\[.*?\]\s*\n+\w+_df\s*=\s*pd\.DataFrame\s*\(\s*\w+_data\s*\)\s*",
+        "", code
+    )
+
+    try:
+        df = pd.DataFrame(state["raw_result"])
+    except Exception as e:
+        state["plot_error"] = f"Failed to create DataFrame from raw_result: {e}"
+        return state
+
+    try:
+        font_path = Path(__file__).resolve().parent.parent.parent / "build" / "DejaVuSans.ttf"
+        fm.fontManager.addfont(str(font_path))
+
+        system = platform.system()
+        if system == "Windows":
+            emoji_font = "Segoe UI Emoji"
+        elif system == "Darwin":
+            emoji_font = "Apple Color Emoji"
+        else:
+            emoji_font = "Noto Color Emoji"
+
+        plt.rcParams['font.family'] = ['DejaVu Sans', emoji_font]
+
+    except Exception as e:
+        state["plot_error"] = f"Font setup failed: {e}"
 
     namespace = {
         "plt": plt,
+        "sns": sns,
+        "pd": pd,
+        "df": df,
         "__builtins__": __builtins__,
     }
 

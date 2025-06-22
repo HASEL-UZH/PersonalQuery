@@ -5,6 +5,8 @@ from typing import Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompt_values import ChatPromptValue
 
+from schemas import WantsPlot
+
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
 CHECKPOINT_DB_PATH = APPDATA_PATH / "personal-query" / "chat_checkpoints.db"
 
@@ -70,7 +72,7 @@ async def title_exists(thread_id: str) -> bool:
     return bool(row and row[0] and row[0].strip())
 
 
-def give_correct_step(current_node: str, branch: str, title_exist: bool = False) -> str:
+def give_correct_step(current_node: str, branch: str, title_exist: bool = False, wants_plot: WantsPlot = WantsPlot.NO) -> str:
     """Predict the next logical step in the workflow based on branch and current node."""
     if branch == "general_qa":
         return "generate_answer"
@@ -83,7 +85,10 @@ def give_correct_step(current_node: str, branch: str, title_exist: bool = False)
         "extract_activities": "get_scope",
         "get_scope": "write_query",
         "write_query": "execute_query",
-        "execute_query": "generate_answer"
+        "execute_query": "generate_answer" if wants_plot == WantsPlot.NO else "check_if_plot_needed" if wants_plot == WantsPlot.AUTO else "create_plot",
+        "is_suitable_for_plot": "generate_answer" if wants_plot == WantsPlot.NO else "create_plot",
+        "create_py_plot_code": "run_plot_script (python)",
+        "execute_py_code": "generate_answer"
     }
 
     return data_query_map.get(current_node, current_node)

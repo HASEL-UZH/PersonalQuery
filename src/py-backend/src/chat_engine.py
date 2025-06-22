@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import sqlite3
 import aiosqlite
 from datetime import datetime, UTC
 from pathlib import Path
@@ -256,7 +255,7 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_
             step_state = step[node_name]
             branch = step_state.get("branch")
             if on_update:
-                next_step = give_correct_step(node_name, branch, step_state.get('title_exist'))
+                next_step = give_correct_step(node_name, branch, step_state.get('title_exist'), step_state.get('wants_plot'))
                 await on_update({"type": "step", "node": next_step})
                 await asyncio.sleep(0)
 
