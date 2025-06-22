@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Callable, Awaitable
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict, Annotated

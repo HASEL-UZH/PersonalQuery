@@ -1,5 +1,5 @@
 from langchain import hub
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.prompt_values import ChatPromptValue
 
 from helper.answer_utils import convert_bracket_to_dollar_latex
@@ -35,11 +35,12 @@ def answer_chain(llm: ChatOpenAI, state: State):
     return response.content
 
 
-def generate_answer(state: State) -> State:
+async def generate_answer(state: State, config: dict) -> State:
     """For LangGraph Orchestration"""
     llm = LLMRegistry.get("openai")
     messages = state["messages"]
     insight_mode = state["insight_mode"]
+    on_update = config.get("configurable", {}).get("callback")
 
     if insight_mode == "diagnostic":
         template = diagnostic_template
@@ -55,39 +56,59 @@ def generate_answer(state: State) -> State:
         "result": state["result"],
         "query": state["query"],
     })
+
     if state['branch'] == "follow_up":
         temp_messages = replace_or_insert_system_prompt(messages, prompt)
-        response = llm.invoke(temp_messages).content
+        stream = llm.astream(temp_messages)
     else:
-        response = llm.invoke(prompt.to_string()).content
+        stream = llm.astream(prompt.to_string())
 
-    formatted_response = convert_bracket_to_dollar_latex(response)
+    final_msg = AIMessage(content="")
 
+    async for chunk in stream:
+        if isinstance(chunk, AIMessageChunk):
+            final_msg = chunk if final_msg.content == "" else final_msg + chunk
+            if on_update:
+                await on_update({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content), "id": final_msg.id})
+
+    formatted_response = convert_bracket_to_dollar_latex(final_msg.content)
     state["answer"] = formatted_response
 
     messages.append(AIMessage(
         content=formatted_response,
+        id=final_msg.id,
         additional_kwargs={
             "meta": {
                 "tables": state["tables"],
                 "activities": state["activities"],
                 "query": state["query"],
                 "result": state["raw_result"],
-                "plotPath": state['plot_path']
+                "plotPath": state.get('plot_path', ""),
+                "plotBase64": state.get('plot_base64', "")
             }
         }
     ))
     return state
 
 
-def general_answer(state: State) -> State:
-    prompt = prompt_template_general.invoke(state['current_time'])
-
+async def general_answer(state: State, config: dict) -> State:
     llm = LLMRegistry.get("openai-high-temp")
+    prompt = prompt_template_general.invoke(state["current_time"])
+    on_update = config.get("configurable", {}).get("callback")
+
     messages = state["messages"]
     temp_messages = replace_or_insert_system_prompt(messages, prompt)
 
-    response = llm.invoke(temp_messages).content
-    state["answer"] = response
-    messages.append(AIMessage(content=response))
+    stream = llm.astream(temp_messages)
+    final_msg = AIMessage(content="")
+
+    async for chunk in stream:
+        if isinstance(chunk, AIMessageChunk):
+            final_msg = chunk if final_msg.content == "" else final_msg + chunk
+            if on_update:
+                await on_update({"type": "chunk", "content": final_msg.content, "id": final_msg.id})
+
+    state["answer"] = final_msg.content
+    assert isinstance(final_msg, AIMessage)
+    messages.append(final_msg)
     return state

@@ -11,11 +11,11 @@ from helper.db_modification import update_sessions_from_usage_data, add_window_a
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await initialize()
     yield
     logging.info("Backend shutting down")
 
 
-initialize()
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -52,33 +52,33 @@ async def websocket_chat(websocket: WebSocket):
 
 
 @app.post("/chats")
-def create_chat():
+async def create_chat():
     """Create a new chat and return its thread ID."""
-    chat_id = get_next_thread_id()
+    chat_id = await get_next_thread_id()
     return {"chat_id": chat_id}
 
 
 @app.get("/chats")
-def get_all_chats():
+async def get_all_chats():
     """Return a list of all chat thread IDs."""
-    return {"chats": list_chats()}
+    return {"chats": await list_chats()}
 
 
 @app.get("/chats/{chat_id}")
-def get_chat(chat_id: str):
+async def get_chat(chat_id: str):
     """Return message history for a given chat."""
-    return get_chat_history(chat_id)
+    return await get_chat_history(chat_id)
 
 
 @app.delete("/chats/{chat_id}")
-def remove_chat(chat_id: str):
-    return delete_chat(chat_id)
+async def remove_chat(chat_id: str):
+    return await delete_chat(chat_id)
 
 
 @app.put("/chats/{chat_id}/rename")
-def rename_chat_endpoint(chat_id: str, new_title: str = Body(..., embed=True)):
+async def rename_chat_endpoint(chat_id: str, new_title: str = Body(..., embed=True)):
     """Rename an existing chat by its chat_id."""
-    return rename_chat(chat_id, new_title)
+    return await rename_chat(chat_id, new_title)
 
 
 @app.post("/approval")
@@ -92,7 +92,7 @@ async def handle_approval(request: Request):
         return {"status": "error", "message": "Missing or invalid 'approval' boolean."}
 
     if approval:
-        msg = resume_stream(chat_id, data)
+        msg = await resume_stream(chat_id, data)
         return msg
     else:
         return {}

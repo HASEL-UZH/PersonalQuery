@@ -30,7 +30,6 @@ interface Approval {
 marked.use(markedKatex());
 
 function formatMessage(message: string) {
-  console.log(message);
   return marked.parse(message);
 }
 
@@ -49,7 +48,9 @@ const currentMeta = ref<Meta>({
   tables: [],
   activities: [],
   query: '',
-  result: []
+  result: [],
+  plotPath: '',
+  plotBase64: ''
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
@@ -281,7 +282,18 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
           <div
             class="prose mx-auto w-full max-w-4xl rounded-lg border border-white/10 px-6 py-5 text-left leading-tight text-base-content"
           >
+            <!-- Render message text -->
             <div v-html="formatMessage(msg.content)" />
+
+            <!-- Render plot if present -->
+            <img
+              v-if="msg.meta?.plotBase64"
+              :src="msg.meta.plotBase64"
+              alt="Generated plot"
+              class="mt-4 w-full max-h-[500px] object-contain border border-white/20 rounded-lg shadow"
+            />
+
+            <!-- Optional metadata info button -->
             <button
               v-if="msg.meta"
               class="btn btn-circle btn-ghost btn-xs float-right mt-2 text-info"
@@ -292,6 +304,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             </button>
           </div>
         </div>
+
         <!-- Approval Request -->
         <div
           v-if="needsApproval && index === wsMessages.length - 1"
