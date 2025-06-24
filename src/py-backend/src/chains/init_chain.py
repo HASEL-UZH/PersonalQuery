@@ -44,7 +44,6 @@ def classify_question(state: State) -> State:
     parsed = llm.with_structured_output(QuestionType).invoke(temp_messages)
     state['branch'] = parsed.questionType
     state['insight_mode'] = parsed.insightMode
-    state['wants_plot'] = parsed.wantsPlot
     return state
 
 

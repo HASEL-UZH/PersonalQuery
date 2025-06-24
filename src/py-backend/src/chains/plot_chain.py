@@ -7,7 +7,6 @@ from helper.env_loader import load_env
 from llm_registry import LLMRegistry
 from schemas import State, PythonOutput, PlotOption
 
-import io
 import os
 import uuid
 import base64
@@ -15,6 +14,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import matplotlib.font_manager as fm
+import networkx as nx
+import plotly.express as px
+import plotly.graph_objects as go
 
 
 load_env()
@@ -44,6 +46,8 @@ def is_suitable_for_plot(state: State):
 def create_py_plot_code(state: State):
     llm = LLMRegistry.get("openai")
 
+    result: list[dict] = state['raw_result']
+
     attempts = state.get("plot_attempts", 0)
     if attempts >= 3:
         state["plot_error"] = "Plot-creation failed after 3 attempts"
@@ -51,12 +55,14 @@ def create_py_plot_code(state: State):
     if attempts == 0:
         prompt = prompt_template_create.invoke({
             "question": state['question'],
-            "result": state['raw_result'][:10],
+            "result": result[:50],
+            "num_records": len(result)
         })
     else:
         prompt = prompt_template_create_again.invoke({
             "question": state['question'],
-            "result": state['raw_result'][:10],
+            "result": state['raw_result'][:50],
+            "number_of_records": len(result),
             "prev_code": state['plot_code'],
             "prev_error": state['plot_error']
         })
@@ -74,11 +80,7 @@ def execute_py_code(state: State) -> State:
 
     code = state.get("plot_code", "")
 
-    if "SAVE_PATH" not in code:
-        state["plot_error"] = "LLM code did not contain SAVE_PATH placeholder"
-        return state
-
-    if "plt.savefig(SAVE_PATH)" not in code:
+    if "plt.savefig(SAVE_PATH)" not in code and "fig.write_image(SAVE_PATH)" not in code:
         state["plot_error"] = "SAVE_PATH found, but not used with plt.savefig(...)"
         return state
 
@@ -116,6 +118,9 @@ def execute_py_code(state: State) -> State:
 
     namespace = {
         "plt": plt,
+        "nx": nx,
+        "px": px,
+        "go": go,
         "sns": sns,
         "pd": pd,
         "df": df,

@@ -38,13 +38,22 @@ export function useChatWebSocket() {
       const data = JSON.parse(event.data);
 
       if (data.type === 'step') {
+        console.log(data.node);
         steps.value = [data.node];
-      } else if (data.type === 'approval') {
+      } else if (data.type === 'interruption') {
+        console.log(data);
         steps.value = [];
-        approvalRequest.value = {
-          data: data.data,
-          chat_id: data.chat_id
-        };
+        const reason = data.reason;
+        console.log("reason:", reason)
+        if (!reason.auto_approve) {
+          console.log("im in here")
+          approvalRequest.value = {
+            data: data.data,
+            chat_id: data.chat_id
+          };
+        }
+        if (!reason.auto_sql) {
+        }
       } else if (data.type === 'chunk') {
         const { id, content } = data;
         if (!partialMessages.has(id)) {
@@ -96,7 +105,7 @@ export function useChatWebSocket() {
   const send = (
     question: string,
     chatId: string,
-    options?: { top_k?: number; autoApprove?: boolean }
+    options?: { top_k?: number; autoApprove?: boolean; autoSQL?: boolean; answerDetail?: string; wantsPlot?: string }
   ) => {
     steps.value = [];
     messages.value.push({ role: 'human', content: question });
@@ -105,7 +114,10 @@ export function useChatWebSocket() {
         question,
         chat_id: chatId,
         top_k: options?.top_k ?? 150,
-        auto_approve: options?.autoApprove ?? false
+        auto_approve: options?.autoApprove ?? false,
+        auto_sql: options?.autoSQL ?? true,
+        answer_detail: options?.answerDetail ?? 'auto',
+        wants_plot: options?.wantsPlot ?? 'auto'
       })
     );
   };

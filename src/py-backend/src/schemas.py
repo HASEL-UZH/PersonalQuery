@@ -27,6 +27,12 @@ class WantsPlot(str, Enum):
     AUTO = "AUTO"
 
 
+class AnswerDetail(str, Enum):
+    LOW = "LOW"
+    HIGH = "HIGH"
+    AUTO = "AUTO"
+
+
 class QuestionType(BaseModel):
     questionType: Literal["data_query", "general_qa", "follow_up"] = Field(
         ..., description="Type of question in order to decide what actions to take."
@@ -35,9 +41,6 @@ class QuestionType(BaseModel):
         "descriptive", "diagnostic", "predictive", "prescriptive"
     ] = Field(
         ..., description="The analytical intent behind the user's question."
-    )
-    wantsPlot: WantsPlot = Field(
-        ..., description="Whether the user expects a visual (yes), does not (no), or lets the assistant decide (auto)."
     )
 
 
@@ -132,10 +135,11 @@ class State(TypedDict):
     tables: List[str]
     activities: List[str]
     query: str
-    raw_result: str
-    result: List[str]
+    raw_result: List[dict]
+    result: str
     answer: str
     top_k: int
+    answer_detail: AnswerDetail
     last_query: str
     adjust_query: bool
     aggregation_feature: Optional[List[AggregationFeature]]

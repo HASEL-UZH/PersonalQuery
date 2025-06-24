@@ -23,7 +23,7 @@ from chains.context_chain import give_context
 from helper.chat_utils import title_exists, give_correct_step
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown
-from schemas import State, WantsPlot
+from schemas import State, WantsPlot, AnswerDetail
 from llm_registry import LLMRegistry
 
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
@@ -186,7 +186,13 @@ async def initialize():
     graph = graph_builder.compile(checkpointer=checkpointer)
 
 
-async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_approve=False, on_update=None) -> Dict:
+async def run_chat(question: str,
+                   chat_id: str,
+                   top_k=150, auto_sql=False,
+                   auto_approve=False,
+                   answer_detail=AnswerDetail.AUTO,
+                   wants_plot=WantsPlot.AUTO,
+                   on_update=None) -> Dict:
     """Main chat execution."""
     now = datetime.now(UTC).isoformat()
     try:
@@ -240,9 +246,14 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_
         "top_k": top_k,
         "last_query": await get_last_query(chat_id),
         "adjust_query": False,
+        "wants_plot": wants_plot,
+        "answer_detail": answer_detail
     }
 
-    interrupt_nodes = [] if auto_approve else ["execute_query"]
+    if not auto_approve or not auto_sql:
+        interrupt_nodes = ["execute_query"]
+    else:
+        interrupt_nodes = []
 
     if on_update:
         await on_update({"type": "step", "node": "classify question"})
@@ -265,10 +276,11 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_
                  "content": answer.content,
                  "additional_kwargs": answer.additional_kwargs
                  }
-    if branch != "general_qa" and not auto_approve:
+    if branch != "general_qa" and (not auto_approve or not auto_sql):
         if on_update:
             await on_update({
-                "type": "approval",
+                "type": "interruption",
+                "reason": {"auto_sql": auto_sql, "auto_approve": auto_approve},
                 "data": data,
                 "chat_id": chat_id
             })
@@ -280,7 +292,7 @@ async def run_chat(question: str, chat_id: str, top_k=150, auto_sql=False, auto_
 async def resume_stream(chat_id: str, data) -> Dict:
     config = {"configurable": {"thread_id": chat_id}}
     final_msg = {}
-    graph.update_state(config, {'raw_result': data, 'result': [format_result_as_markdown(data)]})
+    await graph.aupdate_state(config, {'raw_result': data, 'result': [format_result_as_markdown(data)]})
 
     try:
         async for step in graph.astream(None, config, stream_mode="updates"):

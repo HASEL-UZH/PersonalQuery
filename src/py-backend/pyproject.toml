@@ -25,6 +25,9 @@ psutil = "^7.0.0"
 matplotlib = "^3.10.3"
 pandas = "^2.3.0"
 seaborn = "^0.13.2"
+networkx = "^3.5"
+plotly = "^6.1.2"
+kaleido = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 setuptools = "^78.0.1"

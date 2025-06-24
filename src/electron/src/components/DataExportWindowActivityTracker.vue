@@ -148,7 +148,7 @@ const emitObfuscateSampleData = async () => {
                 <div class="max-w-56 truncate">{{ windowActivity.processPath }}</div>
               </td>
               <td>{{ windowActivity.processId }}</td>
-              <td>{{ windowActivity.ts.toLocaleString() }}</td>
+              <td>{{ windowActivity.tsStart.toLocaleString() }}</td>
             </tr>
           </tbody>
         </table>

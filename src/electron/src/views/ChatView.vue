@@ -12,6 +12,20 @@ import InputText from 'primevue/inputtext';
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);
 const input = ref('');
+const isOpen = ref(true);
+
+const enlargedImage = ref<string | null>(null);
+const showImageModal = ref(false);
+
+function openImageModal(base64: string) {
+  enlargedImage.value = base64;
+  showImageModal.value = true;
+}
+
+function closeImageModal() {
+  showImageModal.value = false;
+  enlargedImage.value = null;
+}
 
 const {
   connect,
@@ -54,7 +68,9 @@ const currentMeta = ref<Meta>({
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
-const autoApproveSQL = ref(false);
+const autoSQL = ref(false);
+const answerDetail = ref('auto');
+const wantsPlot = ref('auto');
 const topK = ref(150);
 const STORAGE_KEY = 'chat_settings';
 
@@ -95,18 +111,24 @@ onMounted(() => {
       const parsed = JSON.parse(saved);
       if (typeof parsed.autoApprove === 'boolean') autoApprove.value = parsed.autoApprove;
       if (typeof parsed.topK === 'number') topK.value = parsed.topK;
+      if (typeof parsed.autoSQL === 'boolean') autoSQL.value = parsed.autoSQL;
+      if (typeof parsed.answerDetail === 'string') answerDetail.value = parsed.answerDetail;
+      if (typeof parsed.wantsPlot === 'string') wantsPlot.value = parsed.wantsPlot;
     } catch (e) {
       console.warn('Invalid chat_settings in localStorage');
     }
   }
 });
 
-watch([autoApprove, topK], () => {
+watch([autoApprove, topK, autoSQL, answerDetail, wantsPlot], () => {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       autoApprove: autoApprove.value,
-      topK: topK.value
+      topK: topK.value,
+      autoSQL: autoSQL.value,
+      answerDetail: answerDetail.value,
+      wantsPlot: wantsPlot.value
     })
   );
 });
@@ -154,7 +176,10 @@ function sendMessage() {
   input.value = '';
   send(userMessage, chatId.value, {
     top_k: topK.value,
-    autoApprove: autoApprove.value
+    autoApprove: autoApprove.value,
+    autoSql: autoSQL.value,
+    answerDetail: answerDetail.value,
+    wantsPlot: wantsPlot.value
   });
 }
 
@@ -290,7 +315,8 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
               v-if="msg.meta?.plotBase64"
               :src="msg.meta.plotBase64"
               alt="Generated plot"
-              class="mt-4 w-full max-h-[500px] object-contain border border-white/20 rounded-lg shadow"
+              class="mt-4 max-h-[500px] w-full cursor-pointer rounded-lg border border-white/20 object-contain shadow transition"
+              @click="openImageModal(msg.meta.plotBase64)"
             />
 
             <!-- Optional metadata info button -->
@@ -300,10 +326,18 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
               @click="openMetaModal(msg.meta)"
               title="View details"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 text-primary">
-                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                class="size-6 text-primary"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+                  clip-rule="evenodd"
+                />
               </svg>
-
             </button>
           </div>
         </div>
@@ -414,14 +448,47 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
     </div>
 
     <form @submit.prevent="sendMessage" class="w-full">
-      <div class="space-y-4 rounded border border-base-300 bg-base-200 p-3">
-        <input
-          v-model="input"
-          class="input input-bordered w-full"
-          placeholder="Type your message..."
-        />
+      <div class="space-y-2 rounded border border-base-300 bg-base-200 p-3">
+        <div class="flex w-full">
+          <input
+            v-model="input"
+            class="input input-bordered w-full rounded-r-none focus:outline-none focus:ring-0"
+            placeholder="Type your message..."
+          />
+          <button class="btn btn-primary rounded-l-none" type="submit">Send</button>
+        </div>
 
-        <div class="flex w-full flex-wrap items-start gap-6">
+        <button class="btn btn-sm mt-0 flex items-center p-1" @click="isOpen = !isOpen">
+          <span>Options</span>
+          <svg
+            v-if="isOpen"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="size-6"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M11.47 7.72a.75.75 0 0 1 1.06 0l7.5 7.5a.75.75 0 1 1-1.06 1.06L12 9.31l-6.97 6.97a.75.75 0 0 1-1.06-1.06l7.5-7.5Z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="size-6"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        <div v-if="isOpen" class="flex w-full flex-wrap items-start gap-6">
           <!-- Privacy Container -->
           <div class="flex w-fit items-start gap-4 rounded-lg border border-white/10 p-2">
             <div class="flex items-center gap-1">
@@ -495,7 +562,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
 
               <!-- Optional: Add SQL Auto-Approve toggle here -->
               <div class="ml-4 flex flex-col items-start">
-                <input type="checkbox" class="toggle toggle-primary" v-model="autoApproveSQL" />
+                <input type="checkbox" class="toggle toggle-primary" v-model="autoSQL" />
                 <div
                   class="tooltip"
                   data-tip="Automatically approve and run generated SQL queries without manual review."
@@ -506,13 +573,144 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             </div>
           </div>
 
-          <!-- Submit Button -->
-          <div class="ml-auto flex items-center self-stretch">
-            <button class="text-md btn btn-primary h-full" type="submit">Send</button>
+          <!-- Answer Style Container -->
+          <div class="flex w-fit items-start gap-4 rounded-lg border border-white/10 p-2">
+            <div class="flex items-center gap-1">
+              <!-- Icon -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-message-square-text h-5 w-5"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <line x1="9" y1="9" x2="15" y2="9" />
+                <line x1="9" y1="13" x2="13" y2="13" />
+              </svg>
+              <span class="text-sm font-medium">Response Style</span>
+            </div>
+            <div class="flex flex-row gap-4">
+              <!-- Granularity -->
+              <div class="form-control">
+                <div class="flex flex-col">
+                  <div class="join">
+                    <div class="tooltip" data-tip="Minimally detailed">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          answerDetail === 'low'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="low" v-model="answerDetail" class="hidden" />
+                        Low
+                      </label>
+                    </div>
+                    <div class="tooltip" data-tip="System decides">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          answerDetail === 'auto'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="auto" v-model="answerDetail" class="hidden" />
+                        Auto
+                      </label>
+                    </div>
+                    <div class="tooltip" data-tip="Highly detailed">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          answerDetail === 'high'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="high" v-model="answerDetail" class="hidden" />
+                        High
+                      </label>
+                    </div>
+                  </div>
+                  <span class="label-text mt-1 self-center text-xs">Granularity</span>
+                </div>
+              </div>
+
+              <!-- Visualization -->
+              <div class="form-control">
+                <div class="flex flex-col">
+                  <div class="join">
+                    <div class="tooltip" data-tip="No visualizations">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          wantsPlot === 'no'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="no" v-model="wantsPlot" class="hidden" />
+                        Never
+                      </label>
+                    </div>
+                    <div class="tooltip" data-tip="System decides">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          wantsPlot === 'auto'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="auto" v-model="wantsPlot" class="hidden" />
+                        Auto
+                      </label>
+                    </div>
+                    <div class="tooltip" data-tip="Always create visualizations">
+                      <label
+                        class="btn join-item btn-sm px-3 text-xs"
+                        :class="[
+                          wantsPlot === 'yes'
+                            ? 'btn-primary'
+                            : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
+                        ]"
+                      >
+                        <input type="radio" value="yes" v-model="wantsPlot" class="hidden" />
+                        Always
+                      </label>
+                    </div>
+                  </div>
+                  <span class="label-text mt-1 self-center text-xs">Visualizations</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </form>
+
+    <!-- Plot Modal -->
+    <dialog v-if="showImageModal" class="modal modal-open" @click.self="closeImageModal">
+      <div class="modal-box w-11/12 max-w-5xl p-4">
+        <img
+          v-if="enlargedImage"
+          :src="enlargedImage"
+          alt="Enlarged plot"
+          class="max-h-[80vh] w-full rounded-lg object-contain"
+        />
+        <div class="modal-action">
+          <button class="btn btn-outline btn-sm" @click="closeImageModal">Close</button>
+        </div>
+      </div>
+    </dialog>
 
     <!-- Info Modal -->
     <dialog ref="metaDialog" class="modal">

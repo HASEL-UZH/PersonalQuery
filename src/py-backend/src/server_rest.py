@@ -7,6 +7,7 @@ from chat_engine import run_chat, get_chat_history, initialize, delete_chat, ren
 from database import DB_PATH
 from helper.chat_utils import get_next_thread_id, list_chats
 from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
+from schemas import AnswerDetail, WantsPlot
 
 
 @asynccontextmanager
@@ -40,10 +41,22 @@ async def websocket_chat(websocket: WebSocket):
             auto_sql = data.get("auto_sql", True)
             auto_approve = data.get("auto_approve", False)
 
+            answer_detail = {
+                'low': AnswerDetail.LOW,
+                'high': AnswerDetail.HIGH,
+                'auto': AnswerDetail.AUTO
+            }.get(data.get("answer_detail", "auto"), AnswerDetail.AUTO)
+
+            wants_plot = {
+                'no': WantsPlot.NO,
+                'yes': WantsPlot.YES,
+                'auto': WantsPlot.AUTO
+            }.get(data.get("wants_plot", "auto"), WantsPlot.AUTO)
+
             async def on_update(update: dict):
                 await websocket.send_json(update)
 
-            msg = await run_chat(question, chat_id, top_k, auto_sql, auto_approve, on_update=on_update)
+            msg = await run_chat(question, chat_id, top_k, auto_sql, auto_approve, answer_detail, wants_plot, on_update=on_update)
             if msg:
                 await websocket.send_json(msg)
 

@@ -5,16 +5,17 @@ aggregation_sql_templates = [
         "feature": AggregationFeature.context_switch,
         "sql_template": """
 SELECT 
-  prev_activity || ' → ' || activity AS switch_type,
+  prev_activity AS "From",
+  activity AS "To",
   COUNT(*) AS switch_count
 FROM (
-  SELECT ts, activity,
-         LAG(activity) OVER (ORDER BY ts) AS prev_activity
+  SELECT tsStart, activity,
+         LAG(activity) OVER (ORDER BY tsStart) AS prev_activity
   FROM window_activity
   WHERE {time_filter}
 )
 WHERE activity != prev_activity
-GROUP BY switch_type
+GROUP BY prev_activity, activity
 ORDER BY switch_count DESC;
 """.strip()
     },
@@ -98,7 +99,7 @@ SELECT
   ROUND(SUM(u.scrollDelta), 2) AS total_scroll
 FROM user_input u
 JOIN window_activity w 
-  ON u.tsStart BETWEEN w.ts AND w.tsEnd
+  ON u.tsStart BETWEEN w.tsStart AND w.tsEnd
 WHERE {time_filter}
 GROUP BY w.activity, w.processName
 ORDER BY total_keystrokes DESC;
@@ -145,12 +146,18 @@ SELECT
   ) AS typing_productivity
 FROM user_input u
 JOIN window_activity w 
-  ON u.tsStart >= w.ts 
-  AND u.tsStart < datetime(w.ts, '+' || w.durationInSeconds || ' seconds')
+  ON u.tsStart BETWEEN w.tsStart AND w.tsEnd
 WHERE {time_filter}
   AND u.keysTotal > 0
-  AND w.activity IN ('WorkRelatedBrowinsg','DevCode', 'DevVc', 'GenerativeAI');
-
+  AND w.activity IN (
+    'WorkRelatedBrowinsg',
+    'DevCode',
+    'DevVc',
+    'GenerativeAI',
+    'Design',
+    'Planning',
+    'ReadWriteDocument'
+  );
 """.strip()
     }
 ]
