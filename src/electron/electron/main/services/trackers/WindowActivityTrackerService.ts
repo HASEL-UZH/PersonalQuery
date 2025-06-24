@@ -1,6 +1,6 @@
 import ActiveWindow from 'windows-activity-tracker/dist/types/ActiveWindow';
 import { WindowActivityEntity } from '../../entities/WindowActivityEntity';
-import { In } from 'typeorm';
+import { DeepPartial, In } from 'typeorm';
 import getMainLogger from '../../../config/Logger';
 import WindowActivityDto from '../../../../shared/dto/WindowActivityDto';
 
@@ -8,31 +8,38 @@ const LOG = getMainLogger('WindowActivityTrackerService');
 
 export class WindowActivityTrackerService {
   private randomStringMap: Map<string, string> = new Map<string, string>();
-  private static lastWindow: ActiveWindow | null = null;
+  private static prevWindowTsStart: Date;
+  private static prevWindowId: string;
 
   public static async handleWindowChange(window: ActiveWindow): Promise<void> {
-    // We only store activities with either a title, or url, or both
+    // Only store activities with a title or URL
     if (!window.windowTitle && !window.url) {
       return;
     }
-    let duration = null;
+    // Finalize the previous window entry
+    if (this.prevWindowId && this.prevWindowTsStart) {
+      const duration = Math.floor(
+        (window.tsStart.getTime() - this.prevWindowTsStart.getTime()) / 1000
+      );
 
-    if (this.lastWindow) {
-      duration = Math.floor((window.ts.getTime() - this.lastWindow.ts.getTime()) / 1000);
+      await WindowActivityEntity.update(this.prevWindowId, {
+        tsEnd: window.tsStart,
+        durationInSeconds: duration
+      });
     }
-
-    await WindowActivityEntity.save({
+    // Save the current window as a new activity entry
+    const entity: DeepPartial<WindowActivityEntity> = {
       windowTitle: window.windowTitle,
       processName: window.process,
       processPath: window.processPath,
       processId: window.processId,
       url: window.url,
       activity: window.activity,
-      ts: window.ts,
-      durationInSeconds: duration
-    });
-
-    this.lastWindow = window;
+      tsStart: window.tsStart
+    };
+    const savedEntity = (await WindowActivityEntity.save(entity)) as WindowActivityEntity;
+    this.prevWindowId = savedEntity.id;
+    this.prevWindowTsStart = savedEntity.tsStart;
   }
 
   public async getMostRecentWindowActivityDtos(itemCount: number): Promise<WindowActivityDto[]> {
@@ -48,7 +55,9 @@ export class WindowActivityTrackerService {
         processId: item.processId,
         url: item.url,
         activity: item.activity,
-        ts: item.ts,
+        tsStart: item.tsStart,
+        tsEnd: item.tsEnd,
+        durationInSeconds: item.durationInSeconds,
         id: item.id,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
@@ -73,7 +82,9 @@ export class WindowActivityTrackerService {
         processPath: activity.processPath,
         processId: activity.processId,
         activity: activity.activity,
-        ts: activity.ts,
+        tsStart: activity.tsStart,
+        tsEnd: activity.tsEnd,
+        durationInSeconds: activity.durationInSeconds,
         id: activity.id,
         createdAt: activity.createdAt,
         updatedAt: activity.updatedAt,

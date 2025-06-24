@@ -50,8 +50,8 @@ export class SessionService {
       }
 
       await SessionEntity.save({
-        startedAt: priorStart.createdAt,
-        endedAt: createdAt,
+        tsStart: priorStart.createdAt,
+        tsEnd: createdAt,
         durationInSeconds: duration,
         question: esr?.question ?? null,
         scale: esr?.scale ?? null,
@@ -84,8 +84,8 @@ export class SessionService {
       );
 
       await SessionEntity.save({
-        startedAt: stripMilliseconds(priorStart.createdAt),
-        endedAt: stripMilliseconds(createdAt),
+        tsStart: stripMilliseconds(priorStart.createdAt),
+        tsEnd: stripMilliseconds(createdAt),
         durationInSeconds: duration,
         question: null,
         scale: null,
@@ -97,7 +97,7 @@ export class SessionService {
 
   public async getMostRecentSessionDtos(count: number): Promise<SessionDto[]> {
     const sessions = await SessionEntity.find({
-      order: { startedAt: 'DESC' },
+      order: { tsStart: 'DESC' },
       take: count
     });
 
@@ -107,8 +107,8 @@ export class SessionService {
       scale: s.scale,
       response: s.response,
       skipped: s.skipped,
-      startedAt: s.startedAt,
-      endedAt: s.endedAt,
+      tsStart: s.tsStart,
+      tsEnd: s.tsEnd,
       durationInSeconds: s.durationInSeconds
     }));
   }

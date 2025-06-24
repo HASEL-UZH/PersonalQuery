@@ -6,9 +6,10 @@ export default interface WindowActivityDto {
   processId: number | null;
   url: string | null;
   activity: string;
-  ts: Date;
+  tsStart: Date;
+  tsEnd: Date;
+  durationInSeconds: number | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  durationInSeconds: number | null;
 }

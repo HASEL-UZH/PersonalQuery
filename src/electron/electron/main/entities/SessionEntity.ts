@@ -15,11 +15,11 @@ export class SessionEntity extends BaseTrackedEntity {
   @Column('boolean', { default: false, nullable: true })
   skipped: boolean;
 
-  @Column('datetime', { precision: 0 })
-  startedAt: Date;
+  @Column('datetime', { precision: 0, nullable: true })
+  tsStart: Date;
 
-  @Column('datetime', { precision: 0 })
-  endedAt: Date;
+  @Column('datetime', { precision: 0, nullable: true })
+  tsEnd: Date;
 
   @Column('int')
   durationInSeconds: number;

@@ -4,7 +4,7 @@ export default interface SessionDto {
   scale: number;
   response: number | null;
   skipped: boolean;
-  startedAt: Date;
-  endedAt: Date;
+  tsStart: Date;
+  tsEnd: Date;
   durationInSeconds: number;
 }

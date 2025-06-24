@@ -14,8 +14,8 @@ def update_sessions_from_usage_data(db_path):
     cur.execute('''
         CREATE TABLE IF NOT EXISTS session (
             id TEXT PRIMARY KEY,
-            startedAt TEXT,
-            endedAt TEXT,
+            tsStart datetime,
+            tsEnd datetime,
             durationInSeconds INTEGER,
             question TEXT,
             scale INTEGER,
@@ -101,7 +101,7 @@ def update_sessions_from_usage_data(db_path):
 
         cur.execute('''
             INSERT INTO session (
-                id, startedAt, endedAt, durationInSeconds,
+                id, tsStart, tsEnd, durationInSeconds,
                 question, scale, response, skipped
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', session)
@@ -112,23 +112,37 @@ def update_sessions_from_usage_data(db_path):
 
 
 def add_window_activity_durations(db_path):
+    import sqlite3
+    from datetime import datetime
+
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     cur = conn.cursor()
 
-    # Try to add column
+    # Step 1: Rename ts → tsStart if needed
+    cur.execute("PRAGMA table_info(window_activity)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "tsStart" not in columns and "ts" in columns:
+        cur.execute("ALTER TABLE window_activity RENAME COLUMN ts TO tsStart")
+
+    # Step 2: Add columns if they don't exist
     try:
         cur.execute('ALTER TABLE window_activity ADD COLUMN durationInSeconds INTEGER')
     except sqlite3.OperationalError:
         pass  # Column exists
 
-    # Clear existing values
-    cur.execute('UPDATE window_activity SET durationInSeconds = NULL')
+    try:
+        cur.execute('ALTER TABLE window_activity ADD COLUMN tsEnd datetime')
+    except sqlite3.OperationalError:
+        pass  # Column exists
 
-    # Load window activity
-    cur.execute('SELECT rowid, ts FROM window_activity ORDER BY ts ASC')
+    # Step 3: Clear existing computed fields
+    cur.execute('UPDATE window_activity SET durationInSeconds = NULL, tsEnd = NULL')
+
+    # Step 4: Load activity rows
+    cur.execute('SELECT rowid, tsStart FROM window_activity ORDER BY tsStart ASC')
     rows = cur.fetchall()
 
-    # Load APP_QUITs
+    # Step 5: Load APP_QUITs
     cur.execute('SELECT created_at FROM usage_data WHERE type = "APP_QUIT"')
     app_quits = [datetime.fromisoformat(row[0]) for row in cur.fetchall()]
     app_quit_by_day = {q.date(): q for q in app_quits}
@@ -140,16 +154,18 @@ def add_window_activity_durations(db_path):
         start_dt = datetime.fromisoformat(current_ts)
         end_dt = datetime.fromisoformat(next_ts)
 
-        # If next window is on next day, check for APP_QUIT cutoff
         if start_dt.date() != end_dt.date():
             quit_dt = app_quit_by_day.get(start_dt.date())
             if quit_dt and start_dt < quit_dt < end_dt:
-                end_dt = quit_dt  # override end time
+                end_dt = quit_dt
 
         duration = int((end_dt - start_dt).total_seconds())
-        cur.execute('UPDATE window_activity SET durationInSeconds = ? WHERE rowid = ?', (duration, current_rowid))
+        cur.execute(
+            'UPDATE window_activity SET durationInSeconds = ?, tsEnd = ? WHERE rowid = ?',
+            (duration, end_dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], current_rowid)
+        )
 
-    # Handle last row with APP_QUIT if available
+    # Step 6: Handle final row
     if rows:
         last_rowid, last_ts = rows[-1]
         start_dt = datetime.fromisoformat(last_ts)
@@ -157,7 +173,10 @@ def add_window_activity_durations(db_path):
 
         if quit_dt and quit_dt > start_dt:
             duration = int((quit_dt - start_dt).total_seconds())
-            cur.execute('UPDATE window_activity SET durationInSeconds = ? WHERE rowid = ?', (duration, last_rowid))
+            cur.execute(
+                'UPDATE window_activity SET durationInSeconds = ?, tsEnd = ? WHERE rowid = ?',
+                (duration, quit_dt.isoformat(), last_rowid)
+            )
 
     conn.commit()
     conn.close()
