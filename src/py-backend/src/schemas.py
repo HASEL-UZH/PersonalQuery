@@ -16,9 +16,77 @@ class Table(BaseModel):
     name: str = Field(description="Name of table in SQL database.")
 
 
-class Activity(BaseModel):
+class Activity(str, Enum):
+    DevCode = Field(
+        "DevCode",
+        description="Writing or editing source code."
+    )
+    DevDebug = Field(
+        "DevDebug",
+        description="Debugging code using tools or logs."
+    )
+    DevReview = Field(
+        "DevReview",
+        description="Reviewing code (e.g., pull requests, diffs)."
+    )
+    DevVc = Field(
+        "DevVc",
+        description="Using version control tools (e.g., Git clients)."
+    )
+    Planning = Field(
+        "Planning",
+        description="Using planning tools like calendars, task managers, project boards."
+    )
+    ReadWriteDocument = Field(
+        "ReadWriteDocument",
+        description="Reading or writing documents (e.g., Word, Google Docs)."
+    )
+    Design = Field(
+        "Design",
+        description="Graphic, UI, or UX design work."
+    )
+    GenerativeAI = Field(
+        "GenerativeAI",
+        description="Using generative AI tools (e.g., ChatGPT, Copilot)."
+    )
+    PlannedMeeting = Field(
+        "PlannedMeeting",
+        description="Participating in scheduled meetings."
+    )
+    Email = Field(
+        "Email",
+        description="Reading, writing, or organizing emails."
+    )
+    InstantMessaging = Field(
+        "InstantMessaging",
+        description="Using chat tools (e.g., Slack, Teams chat)."
+    )
+    WorkRelatedBrowsing = Field(
+        "WorkRelatedBrowsing",
+        description="Websites and Browsing that are related to work."
+    )
+    WorkUnrelatedBrowsing = Field(
+        "WorkUnrelatedBrowsing",
+        description="Websites and Browsing that are unrelated to work."
+    )
+    SocialMedia = Field(
+        "SocialMedia",
+        description="Using platforms like Twitter, Facebook, etc."
+    )
+    FileManagement = Field(
+        "FileManagement",
+        description="Managing files or folders (e.g., Explorer, Finder, file transfers)."
+    )
+
+
+class ActivityFilterList(BaseModel):
     """Relevant activity label from activity column in window_activity."""
-    name: str = Field(description="Activity label to use in SQL filtering.")
+    list: Optional[List[Activity]] = Field(
+        default=None,
+        description="One or more Activity(s) to filter the query."
+    )
+
+
 
 
 class WantsPlot(str, Enum):
@@ -133,7 +201,7 @@ class State(TypedDict):
     insight_mode: str
     current_time: str
     tables: List[str]
-    activities: List[str]
+    activities: Optional[List[Activity]]
     query: str
     raw_result: List[dict]
     result: str
@@ -145,8 +213,10 @@ class State(TypedDict):
     aggregation_feature: Optional[List[AggregationFeature]]
     time_scope: TimeScope
     wants_plot: WantsPlot
-    plot_code: str
-    plot_path: str
-    plot_base64: str
+    plot_code: str | None
+    plot_path: str | None
+    plot_base64: str | None
     plot_error: str | None
     plot_attempts: int
+    auto_approve: bool
+    auto_sql: bool

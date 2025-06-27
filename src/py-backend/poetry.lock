@@ -3210,6 +3210,21 @@ files = [
 ]
 
 [[package]]
+name = "qbstyles"
+version = "0.1.4"
+description = "QB styles for common plotting libraries"
+optional = false
+python-versions = ">=3.5"
+groups = ["main"]
+files = [
+    {file = "qbstyles-0.1.4-py3-none-any.whl", hash = "sha256:30aa0cafdd1445c421298e295c1f85bb6c09185fee70b1226b28fb3fbd628eb5"},
+    {file = "qbstyles-0.1.4.tar.gz", hash = "sha256:03bf00a6c03559cb2d62cbebef4c105989e9addd64df79980c373fb17dce6d80"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.0.3,<4.0"
+
+[[package]]
 name = "regex"
 version = "2024.11.6"
 description = "Alternative regular expression module, to replace re."
@@ -4858,4 +4873,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "058c764548d726dde55f24e1a584f134a772aad9c3a892a5f759b34c9d3264f3"
+content-hash = "35ebc7a72a063f4a4386f1a4f1d08967e5dd6f7afba8bfe77e07c823f86546e1"

@@ -44,7 +44,7 @@ async function createNewChat() {
   const data = await res.json();
 
   await router.push(`/chat/${data.chat_id}`);
-
+  window.dispatchEvent(new CustomEvent('newChatCreated'));
   await fetchChats();
 }
 

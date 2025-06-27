@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { marked } from 'marked';
-import { Meta, Message, useChatWebSocket } from '../utils/WebSocketHandler';
+import { Message, Meta, useChatWebSocket } from '../utils/WebSocketHandler';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import markedKatex from 'marked-katex-extension';
 import { FilterMatchMode } from '@primevue/core/api';
-import InputText from 'primevue/inputtext';
+import ApprovalRequestBox from '../components/ApprovalRequestBox.vue';
+import SQLReviewBox from '../components/SQLReviewBox.vue';
 
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);
@@ -30,15 +31,33 @@ function closeImageModal() {
 const {
   connect,
   send,
+  disconnect,
   messages: wsMessages,
   steps,
   onFinalResponse,
-  approvalRequest
+  interruptionMeta
 } = useChatWebSocket();
 
-interface Approval {
+const mainGreetings = [
+  'Hello there. Want to know how your time was spent?',
+  'Welcome back. Let me know what you want to find out.',
+  'Hi there 👋 What would you like to explore in your data today?',
+  "I'm ready to help you reflect on your digital activity — just ask.",
+  'Greetings. How can I assist with your PersonalAnalytics data?',
+  'PersonalAnalytics observed 👀. PersonalQuery speaks 🗣️.',
+  'I know what you did last session (spoiler: you sat heroically 🪑).',
+  'Thanks for joining the study! What’s on your mind?',
+  'Visuals take extra time, but they might be worth it 📊.'
+];
+
+const greetingDisplayed = ref(true);
+const greetingChunks = ref<string[]>([]);
+const fullGreeting = ref('');
+
+interface Review {
   chat_id: string;
   data: Record<string, any>[];
+  query: string;
 }
 
 marked.use(markedKatex());
@@ -72,6 +91,9 @@ const autoSQL = ref(false);
 const answerDetail = ref('auto');
 const wantsPlot = ref('auto');
 const topK = ref(150);
+const loadingResult = ref(false);
+const loadingQuery = ref(false);
+const sqlError = ref<string | null>(null);
 const STORAGE_KEY = 'chat_settings';
 
 function openMetaModal(meta: Meta) {
@@ -81,6 +103,26 @@ function openMetaModal(meta: Meta) {
 
 function closeMetaModal() {
   metaDialog.value?.close();
+}
+
+const handleNewChatGreeting = () => {
+  greetingDisplayed.value = true;
+  fullGreeting.value = mainGreetings[Math.floor(Math.random() * mainGreetings.length)];
+  simulateGreetingStream(fullGreeting.value);
+};
+
+function simulateGreetingStream(text: string) {
+  greetingChunks.value = [];
+  const words = text.split(' ');
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < words.length) {
+      greetingChunks.value.push(words[i]);
+      i++;
+    } else {
+      clearInterval(interval);
+    }
+  }, 50); // word speed
 }
 
 async function fetchChatHistory() {
@@ -97,11 +139,16 @@ async function fetchChatHistory() {
     }));
 
   wsMessages.value.push(...fetchedMessages);
+
+  if (fetchedMessages.length > 0) {
+    greetingDisplayed.value = false;
+  }
 }
 
 onMounted(() => {
   connect();
   fetchChatHistory();
+  window.addEventListener('newChatCreated', handleNewChatGreeting);
 });
 
 onMounted(() => {
@@ -120,6 +167,11 @@ onMounted(() => {
   }
 });
 
+onBeforeUnmount(() => {
+  disconnect();
+  window.removeEventListener('newChatCreated', handleNewChatGreeting);
+});
+
 watch([autoApprove, topK, autoSQL, answerDetail, wantsPlot], () => {
   localStorage.setItem(
     STORAGE_KEY,
@@ -134,12 +186,20 @@ watch([autoApprove, topK, autoSQL, answerDetail, wantsPlot], () => {
 });
 
 const needsApproval = ref(false);
-const approvalData = ref<Approval | null>(null);
+const needsSQLReview = ref(false);
+const reviewMeta = ref<Review | null>(null);
 
-watch(approvalRequest, () => {
-  if (approvalRequest.value) {
-    needsApproval.value = true;
-    approvalData.value = approvalRequest.value;
+watch(interruptionMeta, () => {
+  console.log('interruptionMeta:', interruptionMeta);
+  if (interruptionMeta.value) {
+    needsApproval.value = !interruptionMeta.value.reason.auto_approve;
+    needsSQLReview.value = !interruptionMeta.value.reason.auto_sql;
+    reviewMeta.value = {
+      chat_id: interruptionMeta.value.chat_id,
+      data: interruptionMeta.value.data,
+      query: interruptionMeta.value.query
+    };
+    console.log('reviewMeta.value', reviewMeta.value);
   }
 });
 
@@ -172,12 +232,13 @@ watch(
 
 function sendMessage() {
   if (!input.value.trim()) return;
+  greetingDisplayed.value = false;
   const userMessage = input.value;
   input.value = '';
   send(userMessage, chatId.value, {
     top_k: topK.value,
     autoApprove: autoApprove.value,
-    autoSql: autoSQL.value,
+    autoSQL: autoSQL.value,
     answerDetail: answerDetail.value,
     wantsPlot: wantsPlot.value
   });
@@ -226,14 +287,11 @@ const sendApproval = async (chatId: string, approval: boolean, data: any) => {
 };
 
 function respondToApproval(approval: boolean) {
-  if (approvalData.value?.chat_id) {
-    sendApproval(approvalData.value.chat_id, approval, approvalData.value.data);
+  if (reviewMeta.value?.chat_id) {
+    sendApproval(reviewMeta.value.chat_id, approval, reviewMeta.value.data);
   }
   needsApproval.value = false;
-  approvalData.value = null;
-  if (approval) {
-    steps.value = ['generate answer'];
-  }
+  reviewMeta.value = null;
 }
 
 const resultData = computed(() => {
@@ -250,7 +308,7 @@ const resultColumns = computed(() => {
 });
 
 const approvalColumns = computed(() => {
-  const firstRow = approvalData.value?.data?.[0];
+  const firstRow = reviewMeta.value?.data?.[0];
   if (!firstRow) return [];
   return Object.keys(firstRow).map((key) => ({
     field: key,
@@ -273,21 +331,126 @@ const onCellEditComplete = (event: any) => {
   data[field] = newValue;
 };
 
-function tableBodyCell({ state }: { state: Record<string, any> }) {
-  return {
-    class: [{ '!py-0': state['d_editing'] }]
-  };
+async function executeQuery(finalQuery: string) {
+  if (!chatId.value) return;
+  sqlError.value = null;
+  loadingResult.value = true;
+  try {
+    const res = await fetch('http://localhost:8000/execute-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId.value,
+        query: finalQuery
+      })
+    });
+    const result = await res.json();
+    if (result) {
+      if (result.error) {
+        sqlError.value = result.error;
+      }
+
+      else if (reviewMeta.value) {
+        reviewMeta.value.data = result;
+      }
+    }
+    steps.value = [];
+  } catch (error) {
+    console.error('Failed to execute SQL:', error);
+  } finally {
+    loadingResult.value = false;
+  }
+}
+
+function resetQuery() {
+  console.log("resetting:", reviewMeta.value?.query)
+  console.log("with:", interruptionMeta.value?.query)
+  if (reviewMeta.value) {
+    reviewMeta.value.query = interruptionMeta.value!.query;
+  }
+}
+
+async function handleLLMCorrection(instruction: string, query: string) {
+  if (!interruptionMeta.value) return;
+  loadingQuery.value = true;
+  const { chat_id } = interruptionMeta.value;
+
+  try {
+    const res = await fetch('http://localhost:8000/correct-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id,
+        query,
+        instruction
+      })
+    });
+
+    const result = await res.json();
+
+    if (result) {
+      reviewMeta.value!.query = result;
+      loadingQuery.value = false;
+    } else {
+      console.warn('No corrected query returned from server');
+    }
+  } catch (err) {
+    console.error('Failed to request query correction:', err);
+  }
+}
+
+async function handleProceedAfterSQL() {
+  if (!reviewMeta.value) return;
+  needsSQLReview.value = false;
+
+  const { chat_id, query, data } = reviewMeta.value;
+
+  try {
+    const res = await fetch('http://localhost:8000/confirm-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id,
+        query,
+        data
+      })
+    });
+
+    const result = await res.json();
+    if (result && result.role === 'ai' && result.content) {
+      console.log("IM IN HEREEEE")
+      wsMessages.value.push({
+        role: result.role,
+        content: result.content,
+        meta: result.additional_kwargs?.meta
+      });
+      reviewMeta.value = null;
+    }
+
+
+  } catch (err) {
+    console.error('Failed to confirm SQL with backend:', err);
+  }
 }
 </script>
 
 <template>
   <div class="flex h-screen flex-col bg-base-100 p-4">
     <div class="scrollable flex-1 space-y-4 overflow-y-auto pr-1">
+      <div
+        v-if="greetingDisplayed"
+        class="flex h-[80%] items-center justify-center px-4 text-center"
+      >
+        <div class="max-w-4xl text-3xl font-semibold leading-relaxed text-base-content">
+          <span v-html="greetingChunks.join(' ')" />
+        </div>
+      </div>
+
       <div v-for="(msg, index) in wsMessages" :key="index" class="w-full">
         <!-- User message -->
         <div v-if="msg.role === 'human'" class="chat chat-end mb-4">
           <div class="chat-bubble chat-bubble-primary max-w-[80%] px-4 py-2 text-base">
-            <div v-html="formatMessage(msg.content)" class="prose prose-base text-black" />
+            <div class="prose prose-base text-black" v-html="formatMessage(msg.content)" />
           </div>
         </div>
         <!-- Loading steps appear directly after the last user message -->
@@ -323,8 +486,8 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             <button
               v-if="msg.meta"
               class="btn btn-circle btn-ghost btn-xs float-right mt-2 text-info"
-              @click="openMetaModal(msg.meta)"
               title="View details"
+              @click="openMetaModal(msg.meta)"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -341,113 +504,35 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             </button>
           </div>
         </div>
-
-        <!-- Approval Request -->
-        <div
-          v-if="needsApproval && index === wsMessages.length - 1"
-          class="mb-4 flex w-full justify-center px-4"
-        >
-          <div
-            class="prose prose-base mx-auto w-full max-w-4xl rounded-lg border border-warning bg-warning/10 px-6 py-5 text-left text-base-content"
-          >
-            <p class="mb-2 font-semibold">
-              Do you approve to send this to OpenAI for further processing?
-            </p>
-
-            <div
-              v-if="approvalData && approvalData.data && approvalData.data.length"
-              class="overflow-y-auto rounded bg-base-100 p-4 text-sm"
-            >
-              <div>
-                <DataTable
-                  :value="approvalData.data"
-                  scrollable
-                  scrollHeight="400px"
-                  striped-rows
-                  removableSort
-                  :filters="filters"
-                  :globalFilterFields="approvalColumns.map((c) => c.field)"
-                  class="!w-auto pt-0"
-                  edit-mode="cell"
-                  @cell-edit-complete="onCellEditComplete"
-                  :pt="{
-                    table: { style: 'min-width: 50rem' },
-                    column: {
-                      bodycell: tableBodyCell
-                    }
-                  }"
-                >
-                  <template #header>
-                    <div
-                      class="custom-datatable-header flex items-center justify-between gap-4 pr-0"
-                    >
-                      <span class="ml-auto">
-                        <input
-                          v-model="globalSearch"
-                          type="text"
-                          placeholder="Search for values..."
-                          class="input input-sm input-bordered w-full max-w-xs"
-                        />
-                      </span>
-                    </div>
-                  </template>
-
-                  <Column header="#" :style="{ whiteSpace: 'nowrap', width: '0.1%' }">
-                    <template #body="{ index }">
-                      {{ index + 1 }}
-                    </template>
-                  </Column>
-                  <Column
-                    v-for="col in approvalColumns"
-                    :key="col.field"
-                    :field="col.field"
-                    :header="col.header"
-                    sortable
-                    :style="{ whiteSpace: 'nowrap', width: '1%' }"
-                    :editable="true"
-                  >
-                    <template #body="slotProps">
-                      <span
-                        :title="slotProps.data[col.field]"
-                        style="
-                          display: inline-block;
-                          max-width: 200px;
-                          overflow: hidden;
-                          text-overflow: ellipsis;
-                          white-space: nowrap;
-                          vertical-align: bottom;
-                        "
-                      >
-                        {{ slotProps.data[col.field] }}
-                      </span>
-                    </template>
-                    <template #editor="{ data, field }">
-                      <InputText
-                        v-model="data[field]"
-                        :autofocus="true"
-                        fluid
-                        :style="{ width: '100%' }"
-                      />
-                    </template>
-                  </Column>
-                </DataTable>
-              </div>
-            </div>
-
-            <div v-else class="p-4 text-sm text-gray-500">No preview available.</div>
-
-            <div class="mt-4 flex justify-end gap-4">
-              <button class="btn btn-outline btn-sm" @click="respondToApproval(false)">No</button>
-              <button class="btn btn-primary btn-sm" @click="respondToApproval(true)">Yes</button>
-            </div>
-          </div>
+        <div class="mb-4 flex w-full justify-center px-4">
+          <SQLReviewBox
+            v-if="needsSQLReview && index === wsMessages.length - 1"
+            :query="reviewMeta?.query"
+            :original-query="interruptionMeta?.query"
+            :result="reviewMeta?.data"
+            :columns="approvalColumns"
+            :filters="filters"
+            :loading-query="loadingQuery"
+            :loading-result="loadingResult"
+            :sql-error="sqlError"
+            @reset-query="resetQuery"
+            @execute-query="executeQuery"
+            @correct-query="handleLLMCorrection"
+            @proceed="handleProceedAfterSQL"
+          />
+          <ApprovalRequestBox
+            v-if="needsApproval && !needsSQLReview && index === wsMessages.length - 1"
+            :data="reviewMeta?.data"
+            @approve="respondToApproval"
+            @cell-edit-complete="onCellEditComplete"
+          />
         </div>
       </div>
 
       <div ref="bottomAnchor"></div>
     </div>
 
-    <form @submit.prevent="sendMessage" class="w-full">
+    <form class="w-full" @submit.prevent="sendMessage">
       <div class="space-y-2 rounded border border-base-300 bg-base-200 p-3">
         <div class="flex w-full">
           <input
@@ -513,7 +598,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
               <span class="text-sm font-medium">Consent</span>
             </div>
             <div class="flex flex-col items-start">
-              <input type="checkbox" class="toggle toggle-primary" v-model="autoApprove" />
+              <input v-model="autoApprove" type="checkbox" class="toggle toggle-primary" />
               <div
                 class="tooltip"
                 data-tip="Allow the system to automatically approve and send sensitive data."
@@ -549,20 +634,29 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
               <div class="flex flex-col items-start">
                 <input
                   id="top_k"
+                  v-model.number="topK"
                   type="range"
                   min="0"
                   max="500"
-                  step="50"
-                  v-model.number="topK"
+                  step="10"
                   class="range"
                   style="width: 250px"
                 />
-                <span class="label-text mt-1 text-xs">Limit Results: {{ topK }}</span>
+                <div class="mt-1 flex items-center gap-2 text-xs">
+                  <label for="top_k">Limit Results:</label>
+                  <input
+                    v-model.number="topK"
+                    type="number"
+                    min="0"
+                    max="500"
+                    class="input input-xs w-min focus:outline-none focus:ring-0"
+                  />
+                </div>
               </div>
 
               <!-- Optional: Add SQL Auto-Approve toggle here -->
               <div class="ml-4 flex flex-col items-start">
-                <input type="checkbox" class="toggle toggle-primary" v-model="autoSQL" />
+                <input v-model="autoSQL" type="checkbox" class="toggle toggle-primary" />
                 <div
                   class="tooltip"
                   data-tip="Automatically approve and run generated SQL queries without manual review."
@@ -609,7 +703,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="low" v-model="answerDetail" class="hidden" />
+                        <input v-model="answerDetail" type="radio" value="low" class="hidden" />
                         Low
                       </label>
                     </div>
@@ -622,7 +716,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="auto" v-model="answerDetail" class="hidden" />
+                        <input v-model="answerDetail" type="radio" value="auto" class="hidden" />
                         Auto
                       </label>
                     </div>
@@ -635,7 +729,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="high" v-model="answerDetail" class="hidden" />
+                        <input v-model="answerDetail" type="radio" value="high" class="hidden" />
                         High
                       </label>
                     </div>
@@ -657,7 +751,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="no" v-model="wantsPlot" class="hidden" />
+                        <input v-model="wantsPlot" type="radio" value="no" class="hidden" />
                         Never
                       </label>
                     </div>
@@ -670,7 +764,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="auto" v-model="wantsPlot" class="hidden" />
+                        <input v-model="wantsPlot" type="radio" value="auto" class="hidden" />
                         Auto
                       </label>
                     </div>
@@ -683,7 +777,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                             : 'btn-outline border border-white/20 hover:bg-transparent hover:text-inherit'
                         ]"
                       >
-                        <input type="radio" value="yes" v-model="wantsPlot" class="hidden" />
+                        <input v-model="wantsPlot" type="radio" value="yes" class="hidden" />
                         Always
                       </label>
                     </div>
@@ -718,7 +812,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
         <!-- Sticky Header -->
         <div class="sticky top-0 z-10 flex items-start justify-between px-6 py-4">
           <h3 class="text-lg font-bold">Details</h3>
-          <button class="btn btn-circle btn-ghost btn-sm" @click="closeMetaModal" title="Close">
+          <button class="btn btn-circle btn-ghost btn-sm" title="Close" @click="closeMetaModal">
             ✕
           </button>
         </div>
@@ -744,11 +838,11 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             <DataTable
               :value="resultData"
               scrollable
-              scrollHeight="400px"
+              scroll-height="400px"
               striped-rows
-              removableSort
+              removable-sort
               :filters="filters"
-              :globalFilterFields="resultColumns.map((c) => c.field)"
+              :global-filter-fields="resultColumns.map((c) => c.field)"
               class="!w-auto pt-1"
             >
               <template #header>
@@ -836,5 +930,15 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
 ::v-deep(.p-datatable-header) {
   padding-bottom: 0;
   border-bottom: var(--bc); /* Tailwind gray-300 or your custom color */
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
 }
 </style>

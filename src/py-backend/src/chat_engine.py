@@ -14,7 +14,7 @@ from langgraph.graph.graph import CompiledGraph
 
 from chains.activity_chain import extract_activities
 from chains.answer_chain import generate_answer, general_answer
-from chains.plot_chain import is_suitable_for_plot, create_py_plot_code, execute_py_code
+from chains.plot_chain import check_if_plot_needed, create_plot, run_plot_script
 from chains.query_chain import write_query, execute_query, check_query_adjustment
 from chains.scope_chain import get_scope
 from chains.table_chain import get_tables
@@ -108,9 +108,9 @@ async def initialize():
 
     graph_builder.add_node("check_query_adjustment", check_query_adjustment)
     graph_builder.add_node("give_context", give_context)
-    graph_builder.add_node("is_suitable_for_plot", is_suitable_for_plot)
-    graph_builder.add_node("create_py_plot_code", create_py_plot_code)
-    graph_builder.add_node("execute_py_code", execute_py_code)
+    graph_builder.add_node("check_if_plot_needed", check_if_plot_needed)
+    graph_builder.add_node("create_plot", create_plot)
+    graph_builder.add_node("run_plot_script", run_plot_script)
     graph_builder.add_node("generate_answer", generate_answer)
 
     graph_builder.add_conditional_edges(
@@ -142,40 +142,40 @@ async def initialize():
     graph_builder.add_conditional_edges(
         "execute_query",
         lambda s: (
-            "create_py_plot_code" if s.get("wants_plot") == WantsPlot.YES
-            else "is_suitable_for_plot" if s.get("wants_plot") == WantsPlot.AUTO
+            "create_plot" if s.get("wants_plot") == WantsPlot.YES
+            else "check_if_plot_needed" if s.get("wants_plot") == WantsPlot.AUTO
             else "generate_answer"
         ),
         {
-            "create_py_plot_code": "create_py_plot_code",
-            "is_suitable_for_plot": "is_suitable_for_plot",
+            "create_plot": "create_plot",
+            "check_if_plot_needed": "check_if_plot_needed",
             "generate_answer": "generate_answer"
         }
     )
 
     graph_builder.add_conditional_edges(
-        "is_suitable_for_plot",
+        "check_if_plot_needed",
         lambda s: (
-            "create_py_plot_code" if s.get("wants_plot") != WantsPlot.NO
+            "create_plot" if s.get("wants_plot") != WantsPlot.NO
             else "generate_answer"
         ),
         {
-            "create_py_plot_code": "create_py_plot_code",
+            "create_plot": "create_plot",
             "generate_answer": "generate_answer"
         }
     )
 
-    graph_builder.add_edge("create_py_plot_code", "execute_py_code")
+    graph_builder.add_edge("create_plot", "run_plot_script")
 
     graph_builder.add_conditional_edges(
-        "execute_py_code",
+        "run_plot_script",
         lambda s: (
-            "create_py_plot_code"
+            "create_plot"
             if s.get("plot_error") and s.get("plot_attempts", 0) < 3
             else "generate_answer"
         ),
         {
-            "create_py_plot_code": "create_py_plot_code",
+            "create_plot": "create_plot",
             "generate_answer": "generate_answer"
         }
     )
@@ -192,7 +192,7 @@ async def run_chat(question: str,
                    auto_approve=False,
                    answer_detail=AnswerDetail.AUTO,
                    wants_plot=WantsPlot.AUTO,
-                   on_update=None) -> Dict:
+                   websocket=None) -> Dict:
     """Main chat execution."""
     now = datetime.now(UTC).isoformat()
     try:
@@ -206,11 +206,11 @@ async def run_chat(question: str,
     except Exception as e:
         print(f"[update_last_activity] Failed to update chat '{chat_id}': {e}")
 
-    config = {"configurable": {"thread_id": chat_id, "callback": on_update}}
+    config = {"configurable": {"thread_id": chat_id, "websocket": websocket}}
     current_time = datetime.now().isoformat()
 
     try:
-        snapshot = graph.get_state(config)
+        snapshot = await graph.aget_state(config)
         messages = snapshot.values.get("messages", [])
     except Exception:
         messages = []
@@ -247,7 +247,13 @@ async def run_chat(question: str,
         "last_query": await get_last_query(chat_id),
         "adjust_query": False,
         "wants_plot": wants_plot,
-        "answer_detail": answer_detail
+        "answer_detail": answer_detail,
+        "auto_sql": auto_sql,
+        "auto_approve": auto_approve,
+        "plot_code": None,
+        "plot_path": None,
+        "plot_base64": None,
+        "plot_attempts": 0
     }
 
     if not auto_approve or not auto_sql:
@@ -255,19 +261,21 @@ async def run_chat(question: str,
     else:
         interrupt_nodes = []
 
-    if on_update:
-        await on_update({"type": "step", "node": "classify question"})
+    if websocket:
+        await websocket.send_json({"type": "step", "node": "classify question"})
 
     async for step in graph.astream(state, config, stream_mode="updates", interrupt_after=interrupt_nodes):
         node_name = list(step.keys())[0]
+        if node_name == "write_query":
+            query = step[node_name].get("query")
         if node_name == "execute_query":
             data = step[node_name].get("raw_result")
         if node_name != "__interrupt__":
             step_state = step[node_name]
             branch = step_state.get("branch")
-            if on_update:
-                next_step = give_correct_step(node_name, branch, step_state.get('title_exist'), step_state.get('wants_plot'))
-                await on_update({"type": "step", "node": next_step})
+            if websocket:
+                next_step = give_correct_step(node_name, step_state)
+                await websocket.send_json({"type": "step", "node": next_step})
                 await asyncio.sleep(0)
 
     answer = state['messages'][-1]
@@ -277,10 +285,11 @@ async def run_chat(question: str,
                  "additional_kwargs": answer.additional_kwargs
                  }
     if branch != "general_qa" and (not auto_approve or not auto_sql):
-        if on_update:
-            await on_update({
+        if websocket:
+            await websocket.send_json({
                 "type": "interruption",
                 "reason": {"auto_sql": auto_sql, "auto_approve": auto_approve},
+                "query": query,
                 "data": data,
                 "chat_id": chat_id
             })
@@ -289,26 +298,69 @@ async def run_chat(question: str,
     return final_msg
 
 
-async def resume_stream(chat_id: str, data) -> Dict:
-    config = {"configurable": {"thread_id": chat_id}}
+async def resume_stream(chat_id: str, data, websocket) -> Dict:
+    config = {"configurable": {"thread_id": chat_id, "websocket": websocket}}
     final_msg = {}
     await graph.aupdate_state(config, {'raw_result': data, 'result': [format_result_as_markdown(data)]})
+    state = await graph.aget_state(config)
+    if state.values.get("wants_plot") == WantsPlot.AUTO:
+        current_step = "check if plot needed"
+    elif state.values.get("wants_plot") == WantsPlot.YES:
+        current_step = "create plot"
+    else:
+        current_step = "generate answer"
+    await websocket.send_json({"type": "step", "node": current_step})
 
     try:
         async for step in graph.astream(None, config, stream_mode="updates"):
             node_name = list(step.keys())[0]
             step_state = step[node_name]
-            answer = step_state.get("messages")[-1]
-            final_msg = {
-                "id": answer.id,
-                "role": "ai",
-                "content": answer.content,
-                "additional_kwargs": answer.additional_kwargs
-            }
-        return final_msg
+            next_step = give_correct_step(node_name, step_state)
+            await websocket.send_json({"type": "step", "node": next_step})
+            await asyncio.sleep(0)
+            if node_name == 'generate_answer':
+                answer = step_state.get("messages")[-1]
+                final_msg = {
+                    "id": answer.id,
+                    "role": "ai",
+                    "content": answer.content,
+                    "additional_kwargs": answer.additional_kwargs
+                }
+        await websocket.send_json(final_msg)
     except Exception as e:
         logging.error(f"[resume_stream] Failed for chat_id={chat_id}: {e}")
         return {"error": "resume failed"}
+
+
+async def update_sql_data(chat_id: str, query, data, websocket):
+    config = {"configurable": {"thread_id": chat_id, "websocket": websocket}}
+    await graph.aupdate_state(config, {'query': query,
+                                       'raw_result': data,
+                                       'result': [format_result_as_markdown(data)]})
+    final_msg = {}
+    state = await graph.aget_state(config)
+    auto_approve = state.values.get('auto_approve')
+    if not auto_approve:
+        return
+    try:
+        async for step in graph.astream(None, config, stream_mode="updates"):
+            node_name = list(step.keys())[0]
+            step_state = step[node_name]
+            await websocket.send_json({"type": "step", "node": node_name})
+            await asyncio.sleep(0)
+            if node_name == 'generate_answer':
+                answer = step_state.get("messages")[-1]
+                final_msg = {
+                    "id": answer.id,
+                    "role": "ai",
+                    "content": answer.content,
+                    "additional_kwargs": answer.additional_kwargs
+                }
+        await websocket.send_json(final_msg)
+    except Exception as e:
+        logging.error(f"[resume_stream] Failed for chat_id={chat_id}: {e}")
+        return {"error": "resume failed"}
+
 
 
 async def get_chat_history(chat_id: str) -> Dict:

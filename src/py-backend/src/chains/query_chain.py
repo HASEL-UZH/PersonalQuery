@@ -6,7 +6,7 @@ from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown, split_result
 from helper.sql_aggregations import aggregation_sql_templates
 from llm_registry import LLMRegistry
-from schemas import State, QueryOutput, AdjustQueryDecision, TimeScope
+from schemas import State, QueryOutput, AdjustQueryDecision, TimeScope, Activity
 
 load_env()
 
@@ -24,28 +24,57 @@ session_template = hub.pull("session")
 adjust_query_decision_template = hub.pull("adjust-query-decision")
 adjust_query_template = hub.pull("adjust-query")
 
+correct_query_template = hub.pull("correct-query")
+
 aggregation_template_map = {
     item["feature"]: item["sql_template"]
     for item in aggregation_sql_templates
 }
 
+browser_activities = {
+    Activity.WorkRelatedBrowsing,
+    Activity.WorkUnrelatedBrowsing
+}
+browser_process_list = [
+    "Brave Browser",
+    "Firefox",
+    "Microsoft Edge",
+    "Google Chrome",
+    "Safari",
+    "Opera",
+    "Opera GX",
+    "Chromium",
+    "Vivaldi",
+    "Tor Browser",
+]
+
 
 def get_custom_table_info(state: State) -> str:
     prompt_parts = []
     tables = state["tables"]
-    activities = state.get("activities")
+    activities = state.get("activities", None)
+    activities_set = set(activities) if activities else set()
 
     for table in tables:
         if table == "user_input":
             prompt_parts.append(ui_template.messages[0].prompt.template)
         elif table == "window_activity":
-            template_input = {
-                "activities": (
-                    f"-FILTER FOR THESE ACTIVITIES: [{', '.join(activities)}]"
-                    if activities else
-                    "-DO NOT FILTER ACTIVITIES"
-                )
-            }
+            if activities_set == browser_activities:
+                template_input = {
+                    "activities": (
+                        f"-Filter column `processName` to include only: [{', '.join(browser_process_list)}]"
+                    )
+                }
+            elif activities:
+                template_input = {
+                    "activities": (
+                        f"Filter column `activity` to include only: [{', '.join(a.name for a in activities)}]"
+                    )
+                }
+            else:
+                template_input = {
+                    "activities": "-DO NOT FILTER ACTIVITIES"
+                }
             prompt_value = wa_template.invoke(template_input)
             prompt_parts.append(prompt_value.messages[0].content)
         elif table == "session":
@@ -71,7 +100,7 @@ def group_based_on_time_scope(ts: TimeScope):
     if ts == ts.session:
         return ""
     if ts == ts.day:
-        return "**Try to group by hours.**"
+        return "**Try to group by hours or sessions.**"
     if ts == ts.week:
         return "**Try to group by days.**"
     if ts == ts.month:
@@ -81,7 +110,6 @@ def group_based_on_time_scope(ts: TimeScope):
 def query_chain(llm: ChatOpenAI):
     def select_template(state: State):
         insight_mode = state.get('insight_mode', "descriptive")
-        update = state.get('adjust_query', False)
         aggregation_features = state.get("aggregation_feature")
 
         if aggregation_features:
@@ -97,16 +125,7 @@ def query_chain(llm: ChatOpenAI):
             aggregation_hint = ""
 
         group_by = group_based_on_time_scope(state.get('time_scope', TimeScope.day))
-        if update:
-            return adjust_query_template.invoke({
-                "dialect": "sqlite",
-                "top_k": state.get('top_k', 150),
-                "table_info": get_custom_table_info(state),
-                "question": state["question"],
-                "last_query": state["last_query"],
-                "aggregation_hint": aggregation_hint,
-                "group_by": group_by
-            })
+
         if insight_mode == "diagnostic":
             template = diagnostic_template
         elif insight_mode == "predictive":
@@ -151,3 +170,21 @@ def execute_query(state: State) -> State:
     chunks = split_result(raw_result)
     state["result"] = [format_result_as_markdown(chunk) for chunk in chunks]
     return state
+
+
+def correct_query(query, instructions):
+    llm = LLMRegistry.get("openai-mini")
+    prompt = correct_query_template.invoke({"instruction": instructions,
+                                            "query": query})
+    parsed = llm.with_structured_output(QueryOutput).invoke(prompt)
+
+    return parsed["query"]
+
+
+def execute_corrected_query(query):
+    db = get_db()
+    try:
+        result = db._execute(query)
+        return result
+    except Exception as e:
+        return {"error": str(e)}

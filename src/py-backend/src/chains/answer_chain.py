@@ -41,7 +41,7 @@ async def generate_answer(state: State, config: dict) -> State:
     llm2 = LLMRegistry.get("llama31")
     messages = state["messages"]
     insight_mode = state["insight_mode"]
-    on_update = config.get("configurable", {}).get("callback")
+    ws = config.get("configurable", {}).get("websocket")
 
     if insight_mode == "diagnostic":
         template = diagnostic_template
@@ -59,7 +59,7 @@ async def generate_answer(state: State, config: dict) -> State:
 
     granularity_instruction = {
         AnswerDetail.HIGH: "- Provide a detailed response that remains relevant and focused.",
-        AnswerDetail.LOW: "- Provide a concise response that directly answers the user's question.",
+        AnswerDetail.LOW: "- Provide a concise response that directly answers the user's question. The response should be as high-level as possible. No long bullet point lists of summarizing your findings.",
         AnswerDetail.AUTO: "- Use your judgment to decide the appropriate level of detail based on the question and data."
     }.get(state["answer_detail"], "")
 
@@ -87,8 +87,8 @@ async def generate_answer(state: State, config: dict) -> State:
     async for chunk in stream:
         if isinstance(chunk, AIMessageChunk):
             final_msg = chunk if final_msg.content == "" else final_msg + chunk
-            if on_update:
-                await on_update({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content), "id": final_msg.id})
+            if ws:
+                await ws.send_json({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content), "id": final_msg.id})
     """""
     final_msg2 = AIMessage(content="")
     async for chunk in stream2:
@@ -120,7 +120,7 @@ async def generate_answer(state: State, config: dict) -> State:
 async def general_answer(state: State, config: dict) -> State:
     llm = LLMRegistry.get("openai-high-temp")
     prompt = prompt_template_general.invoke(state["current_time"])
-    on_update = config.get("configurable", {}).get("callback")
+    ws = config.get("configurable", {}).get("websocket")
 
     messages = state["messages"]
     temp_messages = replace_or_insert_system_prompt(messages, prompt)
@@ -131,8 +131,8 @@ async def general_answer(state: State, config: dict) -> State:
     async for chunk in stream:
         if isinstance(chunk, AIMessageChunk):
             final_msg = chunk if final_msg.content == "" else final_msg + chunk
-            if on_update:
-                await on_update({"type": "chunk", "content": final_msg.content, "id": final_msg.id})
+            if ws:
+                await ws.send_json({"type": "chunk", "content": final_msg.content, "id": final_msg.id})
 
     state["answer"] = final_msg.content
     assert isinstance(final_msg, AIMessage)

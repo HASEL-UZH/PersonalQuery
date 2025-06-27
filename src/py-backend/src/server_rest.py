@@ -1,9 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
-from chat_engine import run_chat, get_chat_history, initialize, delete_chat, rename_chat, resume_stream
+
+from chains.query_chain import correct_query, execute_corrected_query
+from chat_engine import run_chat, get_chat_history, initialize, delete_chat, rename_chat, resume_stream, update_sql_data
 from database import DB_PATH
 from helper.chat_utils import get_next_thread_id, list_chats
 from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
@@ -26,9 +29,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+active_websocket: Optional[WebSocket] = None
+
 
 @app.websocket("/ws")
 async def websocket_chat(websocket: WebSocket):
+    global active_websocket
+    active_websocket = websocket
     await websocket.accept()
 
     try:
@@ -53,14 +60,12 @@ async def websocket_chat(websocket: WebSocket):
                 'auto': WantsPlot.AUTO
             }.get(data.get("wants_plot", "auto"), WantsPlot.AUTO)
 
-            async def on_update(update: dict):
-                await websocket.send_json(update)
-
-            msg = await run_chat(question, chat_id, top_k, auto_sql, auto_approve, answer_detail, wants_plot, on_update=on_update)
+            msg = await run_chat(question, chat_id, top_k, auto_sql, auto_approve, answer_detail, wants_plot, websocket)
             if msg:
                 await websocket.send_json(msg)
 
     except WebSocketDisconnect:
+        active_websocket = None
         logging.info("Client disconnected")
 
 
@@ -105,19 +110,42 @@ async def handle_approval(request: Request):
         return {"status": "error", "message": "Missing or invalid 'approval' boolean."}
 
     if approval:
-        msg = await resume_stream(chat_id, data)
+        msg = await resume_stream(chat_id, data, active_websocket)
         return msg
     else:
         return {}
 
 
-@app.post("/adjust-query")
+@app.post("/correct-query")
 async def adjust_query(request: Request):
+    payload = await request.json()
+    query = payload.get("query")
+    instruction = payload.get("instruction")
+
+    query = correct_query(query, instruction)
+    return query
+
+
+@app.post("/execute-query")
+async def execute_query(request: Request):
+    payload = await request.json()
+    query = payload.get("query")
+
+    result = execute_corrected_query(query)
+    return result
+
+
+@app.post("/confirm-query")
+async def confirm_query(request: Request):
     payload = await request.json()
     chat_id = payload.get("chat_id")
     query = payload.get("query")
-    adjusted_query = payload.get("adjusted_query")
-    response = payload.get("response")
+    data = payload.get("data")
+
+    msg = await update_sql_data(chat_id, query, data, active_websocket)
+    return msg
+
+
 
 
 @app.post("/initialize-data")

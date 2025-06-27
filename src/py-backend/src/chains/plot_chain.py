@@ -4,6 +4,7 @@ import platform
 from langchain import hub
 
 from helper.env_loader import load_env
+from helper.plot_style_patch import patched_draw_nodes, patched_draw_labels, patched_draw_edges
 from llm_registry import LLMRegistry
 from schemas import State, PythonOutput, PlotOption
 
@@ -16,6 +17,8 @@ import pandas as pd
 import matplotlib.font_manager as fm
 import networkx as nx
 import plotly.express as px
+import plotly.io as pio
+from qbstyles import mpl_style
 import plotly.graph_objects as go
 
 
@@ -29,7 +32,7 @@ PLOT_DIR = APPDATA_PATH / "personal-query" / "plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def is_suitable_for_plot(state: State):
+def check_if_plot_needed(state: State):
     llm = LLMRegistry.get("openai")
 
     prompt = prompt_template_auto.invoke({
@@ -43,7 +46,7 @@ def is_suitable_for_plot(state: State):
     return state
 
 
-def create_py_plot_code(state: State):
+def create_plot(state: State):
     llm = LLMRegistry.get("openai")
 
     result: list[dict] = state['raw_result']
@@ -55,13 +58,15 @@ def create_py_plot_code(state: State):
     if attempts == 0:
         prompt = prompt_template_create.invoke({
             "question": state['question'],
-            "result": result[:50],
+            "first_25": state['raw_result'][:25],
+            "last_25": state['raw_result'][-25:],
             "num_records": len(result)
         })
     else:
         prompt = prompt_template_create_again.invoke({
             "question": state['question'],
-            "result": state['raw_result'][:50],
+            "first_25": state['raw_result'][:25],
+            "last_25": state['raw_result'][-25:],
             "number_of_records": len(result),
             "prev_code": state['plot_code'],
             "prev_error": state['plot_error']
@@ -73,7 +78,7 @@ def create_py_plot_code(state: State):
     return state
 
 
-def execute_py_code(state: State) -> State:
+def run_plot_script(state: State) -> State:
     """Execute LLM-generated Python plot code, replace SAVE_PATH, and store result."""
     filename = f"{uuid.uuid4().hex}.png"
     full_path = PLOT_DIR / filename
@@ -113,12 +118,13 @@ def execute_py_code(state: State) -> State:
 
         plt.rcParams['font.family'] = ['DejaVu Sans', emoji_font]
 
+        mpl_style(dark=True)
+
     except Exception as e:
         state["plot_error"] = f"Font setup failed: {e}"
 
     namespace = {
         "plt": plt,
-        "nx": nx,
         "px": px,
         "go": go,
         "sns": sns,
