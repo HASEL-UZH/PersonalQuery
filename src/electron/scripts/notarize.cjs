@@ -1,5 +1,6 @@
 const { notarize } = require('@electron/notarize');
-const { execSync } = require('child_process');
+const { spawn } = require('child_process');
+const path = require('path');
 
 exports.default = async function afterSign(context) {
   const { electronPlatformName, appOutDir, packager } = context;
@@ -28,23 +29,49 @@ exports.default = async function afterSign(context) {
       appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID
     });
-  }
+  } else if (electronPlatformName === 'win32') {
+    console.info('Signing Windows executable using Azure Trusted Signing.');
 
-  if (electronPlatformName === 'win32') {
-    const exePath = `${appOutDir}\\${packager.appInfo.productFilename}.exe`;
-    const command =
-      `pwsh.exe -NoProfile -NonInteractive -Command ` +
-      `Invoke-TrustedSigning ` +
-      `-Endpoint '${process.env.AZURE_ENDPOINT}' ` +
-      `-CertificateProfileName '${process.env.AZURE_CERT_PROFILE_NAME}' ` +
-      `-CodeSigningAccountName '${process.env.AZURE_CODE_SIGNING_NAME}' ` +
-      `-PublisherName '${process.env.AZURE_PUBLISHER_NAME}' ` +
-      `-TimestampRfc3161 'http://timestamp.acs.microsoft.com' ` +
-      `-TimestampDigest 'SHA256' ` +
-      `-FileDigest 'SHA256' ` +
-      `-Files "${exePath}"`;
+    const appName = packager.appInfo.productFilename;
+    const exePath = path.join(appOutDir, `${appName}.exe`);
 
-    console.info(`Signing Windows executable with Azure Trusted Signing: ${exePath}`);
-    execSync(command, { stdio: 'inherit' });
+    await new Promise((resolve, reject) => {
+      const child = spawn(
+        'pwsh.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'Invoke-TrustedSigning',
+          '-Endpoint',
+          process.env.AZURE_ENDPOINT,
+          '-CertificateProfileName',
+          process.env.AZURE_CERT_PROFILE_NAME,
+          '-CodeSigningAccountName',
+          process.env.AZURE_CODE_SIGNING_NAME,
+          '-PublisherName',
+          process.env.AZURE_PUBLISHER_NAME,
+          '-TimestampRfc3161',
+          'http://timestamp.acs.microsoft.com',
+          '-TimestampDigest',
+          'SHA256',
+          '-FileDigest',
+          'SHA256',
+          '-Files',
+          exePath
+        ],
+        { stdio: 'inherit' }
+      );
+
+      child.on('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`TrustedSigning exited with code ${code}`));
+        }
+      });
+    });
+  } else {
+    console.info(`Skipping afterSign step for platform: ${electronPlatformName}`);
   }
 };
