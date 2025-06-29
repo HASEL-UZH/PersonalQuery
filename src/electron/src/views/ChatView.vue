@@ -9,6 +9,9 @@ import markedKatex from 'marked-katex-extension';
 import { FilterMatchMode } from '@primevue/core/api';
 import ApprovalRequestBox from '../components/ApprovalRequestBox.vue';
 import SQLReviewBox from '../components/SQLReviewBox.vue';
+import typedIpcRenderer from '../utils/typedIpcRenderer';
+import VueDatePicker from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css';
 
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);
@@ -114,9 +117,11 @@ function closeMetaModal() {
 }
 
 const handleNewChatGreeting = () => {
-  greetingDisplayed.value = true;
-  fullGreeting.value = mainGreetings[Math.floor(Math.random() * mainGreetings.length)];
-  simulateGreetingStream(fullGreeting.value);
+  if (wsMessages.value.length === 0) {
+    greetingDisplayed.value = true;
+    fullGreeting.value = mainGreetings[Math.floor(Math.random() * mainGreetings.length)];
+    simulateGreetingStream(fullGreeting.value);
+  }
 };
 
 function simulateGreetingStream(text: string) {
@@ -156,6 +161,7 @@ async function fetchChatHistory() {
 
 onMounted(() => {
   connect();
+  handleNewChatGreeting();
   fetchChatHistory();
   window.addEventListener('newChatCreated', handleNewChatGreeting);
 });
@@ -326,7 +332,7 @@ const submitFeedback = async (chatId: string, feedback: Feedback) => {
 
     const result = await res.json();
     console.log('Feedback submitted:', result);
-    console.log('Adding msg to submitted feedbacks:', feedback.messageId)
+    console.log('Adding msg to submitted feedbacks:', feedback.messageId);
     submittedFeedbacks.value.add(feedback.messageId);
   } catch (err) {
     console.error('Failed to send feedback:', err);
@@ -475,18 +481,100 @@ async function handleProceedAfterSQL() {
     console.error('Failed to confirm SQL with backend:', err);
   }
 }
+
+const selectedQuestion = ref<string | null>(null);
+const showDatePicker = ref(false);
+const selectedDate = ref<Date | [Date, Date] | null>(null);
+const coverageScores = ref<Record<string, number>>({});
+
+const suggestedQuestions = [
+  'Show me where I spent the most time',
+  'Analyze my typing activity',
+  'Compare my focus between categories'
+];
+
+function onSelectQuestion(q: string) {
+  selectedQuestion.value = q;
+  showDatePicker.value = true;
+}
+
+function getDayClass(date: Date) {
+  const iso = date.toISOString().slice(0, 10);
+  const score = coverageScores.value[iso] || 0;
+  if (score >= 50) return 'high-activity';
+  if (score >= 20) return 'medium-activity';
+  if (score > 0) return 'low-activity';
+  return '';
+}
+
+function onConfirmSelection() {
+  let dateString = "";
+
+  if (Array.isArray(selectedDate.value)) {
+    const [start, end] = selectedDate.value;
+    if (start && end) {
+      dateString = `${formatDate(start)} to ${formatDate(end)}`;
+    } else if (start) {
+      dateString = formatDate(start);
+    } else {
+      dateString = "No date selected";
+    }
+  } else if (selectedDate.value instanceof Date) {
+    dateString = formatDate(selectedDate.value);
+  } else {
+    dateString = "No date selected";
+  }
+
+  input.value = `${selectedQuestion.value}, ${dateString}`;
+  showDatePicker.value = false;
+}
+
+function formatDate(d: unknown): string {
+  if (d instanceof Date) {
+    const parts = d.toDateString().split(" ");
+    return `${parts[1]} ${parts[2]} ${parts[3]}`;
+  }
+  return "Invalid date";
+}
+
+
+onMounted(async () => {
+  const data = await typedIpcRenderer.invoke('getDataCoverageScore');
+  coverageScores.value = Object.fromEntries(data.map((d) => [d.day, d.score]));
+  console.log('coverageScores loaded:', coverageScores.value);
+});
 </script>
 
 <template>
   <div class="flex h-screen flex-col bg-base-100 p-4">
-    <div class="scrollable flex-1 space-y-4 overflow-y-auto pr-1">
+    <div class="scrollable flex flex-col flex-1 overflow-y-auto space-y-4 pr-1">
       <div
         v-if="greetingDisplayed"
-        class="flex h-[80%] items-center justify-center px-4 text-center"
+        class="flex flex-grow items-center justify-center px-4 text-center"
       >
         <div class="max-w-4xl text-3xl font-semibold leading-relaxed text-base-content">
           <span v-html="greetingChunks.join(' ')" />
         </div>
+      </div>
+      <div
+        v-if="greetingDisplayed"
+        class="flex flex-col items-center justify-center px-4 text-center"
+      >
+        <h3 class="mb-4 text-lg font-semibold">Quick Start</h3>
+        <ul class="flex flex-wrap gap-10">
+          <li v-for="q in suggestedQuestions" :key="q">
+            <button
+              :key="q"
+              @click="onSelectQuestion(q)"
+              :class="[
+    'btn',
+    selectedQuestion === q ? 'btn-primary' : 'btn-outline'
+  ]"
+            >
+              {{ q }}
+            </button>
+          </li>
+        </ul>
       </div>
 
       <div v-for="(msg, index) in wsMessages" :key="index" class="w-full">
@@ -529,7 +617,10 @@ async function handleProceedAfterSQL() {
               v-if="msg.meta && msg.id"
               class="mt-4 flex flex-col border-t border-white/10 pt-4 text-sm"
             >
-              <div v-if="submittedFeedbacks.has(msg.id) || msg.meta.fbSubmitted" class="mt-2 text-success font-semibold">
+              <div
+                v-if="submittedFeedbacks.has(msg.id) || msg.meta.fbSubmitted"
+                class="mt-2 font-semibold text-success"
+              >
                 Feedback saved!
               </div>
               <div v-else class="flex flex-row gap-4">
@@ -541,20 +632,32 @@ async function handleProceedAfterSQL() {
                       :class="{ 'btn-success': getFeedbackState(msg.id).dataCorrect === 'yes' }"
                       @click="getFeedbackState(msg.id).dataCorrect = 'yes'"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
-                        <path d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        class="size-4"
+                      >
+                        <path
+                          d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z"
+                        />
                       </svg>
-
                     </button>
                     <button
                       class="btn btn-xs"
                       :class="{ 'btn-error': getFeedbackState(msg.id).dataCorrect === 'no' }"
                       @click="getFeedbackState(msg.id).dataCorrect = 'no'"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
-                        <path d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        class="size-4"
+                      >
+                        <path
+                          d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z"
+                        />
                       </svg>
-
                     </button>
                   </div>
                 </div>
@@ -569,20 +672,32 @@ async function handleProceedAfterSQL() {
                       }"
                       @click="getFeedbackState(msg.id).questionAnswered = 'yes'"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
-                        <path d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        class="size-4"
+                      >
+                        <path
+                          d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z"
+                        />
                       </svg>
-
                     </button>
                     <button
                       class="btn btn-xs"
                       :class="{ 'btn-error': getFeedbackState(msg.id).questionAnswered === 'no' }"
                       @click="getFeedbackState(msg.id).questionAnswered = 'no'"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
-                        <path d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        class="size-4"
+                      >
+                        <path
+                          d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z"
+                        />
                       </svg>
-
                     </button>
                   </div>
                 </div>
@@ -918,6 +1033,68 @@ async function handleProceedAfterSQL() {
       </div>
     </form>
 
+    <dialog
+      v-if="showDatePicker"
+      class="modal modal-open"
+      @click.self="() => showDatePicker = false"
+    >
+      <div
+        class="modal-box p-6 flex flex-col justify-between"
+        style="height: 600px; max-width: 32rem;"
+      >
+        <div>
+          <!-- Modal Title -->
+          <h2 class="text-lg font-semibold mb-2">
+            Select a Time Scope for the question:
+          </h2>
+          <p class="mb-2">
+            '{{ selectedQuestion }}'
+          </p>
+
+          <div class="mt-6">
+            <label class="block text-sm font-semibold mb-1">
+              Data Richness
+            </label>
+            <!-- Gradient bar -->
+            <div
+              class="w-full h-4 rounded"
+              style="background: linear-gradient(to right, white, #22c55e);"
+            ></div>
+            <!-- Labels -->
+            <div class="flex justify-between text-xs text-gray-600 mt-1">
+              <span>No Data</span>
+              <span>High Coverage</span>
+            </div>
+          </div>
+
+          <!-- Date Picker -->
+          <VueDatePicker
+            v-if="showDatePicker"
+            v-model="selectedDate"
+            :day-class="getDayClass"
+            :enable-time-picker="false"
+            range
+            class="w-full flex-grow mt-2 mb-6"
+          />
+        </div>
+
+        <!-- Confirm Button fixed at the bottom -->
+        <div class="mt-4 text-right">
+          <button
+            v-if="selectedDate"
+            @click="onConfirmSelection"
+            class="btn btn-primary"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+
+
+
+
     <!-- Plot Modal -->
     <dialog v-if="showImageModal" class="modal modal-open" @click.self="closeImageModal">
       <div class="modal-box w-11/12 max-w-5xl p-4">
@@ -1068,4 +1245,34 @@ input[type='number']::-webkit-inner-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
 }
+/* Heatmap backgrounds (always apply) */
+:deep(.dp__cell_inner.low-activity) {
+  background-color: rgba(34, 197, 94, 0.2);
+}
+:deep(.dp__cell_inner.medium-activity) {
+  background-color: rgba(34, 197, 94, 0.5);
+  color: white;
+}
+:deep(.dp__cell_inner.high-activity) {
+  background-color: rgba(34, 197, 94, 0.9);
+  color: white;
+}
+
+/* Selection styles when NO heatmap class is present */
+:deep(.dp__cell_inner.dp__active_date:not(.low-activity):not(.medium-activity):not(.high-activity)),
+:deep(.dp__cell_inner.dp__range_start:not(.low-activity):not(.medium-activity):not(.high-activity)),
+:deep(.dp__cell_inner.dp__range_end:not(.low-activity):not(.medium-activity):not(.high-activity)) {
+  background-color: transparent !important;
+}
+
+/* Border always applied on selection, regardless of heatmap */
+:deep(.dp__cell_inner.dp__active_date),
+:deep(.dp__cell_inner.dp__range_start),
+:deep(.dp__cell_inner.dp__range_end) {
+  border: 2px solid #4b99ff;
+  border-radius: 4px;
+  color: inherit;
+}
+
+
 </style>

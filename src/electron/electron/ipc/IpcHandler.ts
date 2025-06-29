@@ -25,6 +25,7 @@ import { WorkHoursDto } from 'shared/dto/WorkHoursDto';
 import path from 'path';
 import { SessionService } from '../main/services/SessionService';
 import { UsageDataEventType } from '../enums/UsageDataEventType.enum';
+import { DatabaseService } from '../main/services/DatabaseService';
 
 const LOG = getMainLogger('IpcHandler');
 
@@ -39,6 +40,7 @@ export class IpcHandler {
   private readonly userInputService: UserInputTrackerService;
   private readonly dataExportService: DataExportService;
   private readonly workScheduleService: WorkScheduleService;
+  private readonly databaseService: DatabaseService;
   private typedIpcMain: TypedIpcMain<Events, Commands> = ipcMain as TypedIpcMain<Events, Commands>;
 
   constructor(
@@ -46,7 +48,8 @@ export class IpcHandler {
     trackerService: TrackerService,
     experienceSamplingService: ExperienceSamplingService,
     sessionService: SessionService,
-    workScheduleService: WorkScheduleService
+    workScheduleService: WorkScheduleService,
+    databaseService: DatabaseService
   ) {
     this.windowService = windowService;
     this.trackerService = trackerService;
@@ -56,6 +59,7 @@ export class IpcHandler {
     this.userInputService = new UserInputTrackerService();
     this.dataExportService = new DataExportService();
     this.workScheduleService = workScheduleService;
+    this.databaseService = databaseService;
   }
 
   public async init(): Promise<void> {
@@ -82,7 +86,8 @@ export class IpcHandler {
       openUploadUrl: this.openUploadUrl,
       startAllTrackers: this.startAllTrackers,
       triggerPermissionCheckAccessibility: this.triggerPermissionCheckAccessibility,
-      triggerPermissionCheckScreenRecording: this.triggerPermissionCheckScreenRecording
+      triggerPermissionCheckScreenRecording: this.triggerPermissionCheckScreenRecording,
+      getDataCoverageScore: this.getDataCoverageScore
     };
 
     Object.keys(this.actions).forEach((action: string): void => {
@@ -257,5 +262,9 @@ export class IpcHandler {
     } catch (e) {
       LOG.error('Error starting trackers', e);
     }
+  }
+
+  private async getDataCoverageScore(): Promise<{ day: string; score: number }[]> {
+    return await this.databaseService.getDataCoverageScore();
   }
 }

@@ -4,6 +4,7 @@ import UserInputDto from '../../shared/dto/UserInputDto';
 import WindowActivityDto from '../../shared/dto/WindowActivityDto';
 import ExperienceSamplingDto from '../../shared/dto/ExperienceSamplingDto';
 import { WorkHoursDto } from '../../shared/dto/WorkHoursDto';
+import CoverageScore from '../../shared/CoverageScore';
 
 type Commands = {
   createExperienceSample: (
@@ -39,5 +40,6 @@ type Commands = {
   startAllTrackers: () => void;
   triggerPermissionCheckAccessibility: (prompt: boolean) => boolean;
   triggerPermissionCheckScreenRecording: () => boolean;
+  getDataCoverageScore: () => Promise<CoverageScore[]>;
 };
 export default Commands;

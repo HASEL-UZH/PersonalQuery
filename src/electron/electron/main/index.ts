@@ -52,7 +52,8 @@ const ipcHandler: IpcHandler = new IpcHandler(
   trackers,
   experienceSamplingService,
   sessionService,
-  workScheduleService
+  workScheduleService,
+  databaseService
 );
 const isDev = process.env.NODE_ENV === 'development';
 let backendProcess: ReturnType<typeof spawn> | null = null;

@@ -11,6 +11,7 @@ import { UsageDataEntity } from '../entities/UsageDataEntity';
 import { WorkDayEntity } from '../entities/WorkDayEntity';
 import { SessionEntity } from '../entities/SessionEntity';
 import fs from 'node:fs';
+import CoverageScore from '../../../shared/CoverageScore';
 
 const LOG = getMainLogger('DatabaseService');
 
@@ -120,5 +121,52 @@ export class DatabaseService {
     } catch (e) {
       LOG.error('Failed to reach Python backend for cleanup:', e);
     }
+  }
+
+  public async getDataCoverageScore(): Promise<CoverageScore[]> {
+    const windowActivity = await this.dataSource.query(`
+    SELECT date(tsStart) AS day, COUNT(*) AS count
+    FROM window_activity
+    GROUP BY day
+  `);
+
+    const userInput = await this.dataSource.query(`
+    SELECT date(tsStart) AS day, COUNT(*) AS count
+    FROM user_input
+    GROUP BY day
+  `);
+
+    const sessions = await this.dataSource.query(`
+    SELECT date(tsStart) AS day, COUNT(*) AS count
+    FROM session
+    GROUP BY day
+  `);
+
+    const allDays = new Map<string, { wa: number; ui: number; s: number }>();
+
+    for (const row of windowActivity) {
+      allDays.set(row.day, { wa: row.count, ui: 0, s: 0 });
+    }
+    for (const row of userInput) {
+      const entry = allDays.get(row.day) ?? { wa: 0, ui: 0, s: 0 };
+      entry.ui = row.count;
+      allDays.set(row.day, entry);
+    }
+    for (const row of sessions) {
+      const entry = allDays.get(row.day) ?? { wa: 0, ui: 0, s: 0 };
+      entry.s = row.count;
+      allDays.set(row.day, entry);
+    }
+
+    // Convert to array with computed score
+    const result: CoverageScore[] = Array.from(allDays.entries()).map(([day, counts]) => ({
+      day,
+      score: Math.round((counts.wa + counts.ui + counts.s * 10) / 100)
+    }));
+
+    // Sort descending by score
+    result.sort((a, b) => b.score - a.score);
+
+    return result;
   }
 }
