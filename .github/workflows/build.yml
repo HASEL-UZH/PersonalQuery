@@ -18,10 +18,10 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-          #- os: macos-latest
-          #  mac_arch: arm64
-          #- os: macos-latest
-          #  mac_arch: x64
+          - os: macos-latest
+            mac_arch: arm64
+          - os: macos-latest
+            mac_arch: x64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,36 +32,30 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Set up Python + Poetry for Windows
-      - name: Set up Python (Windows only)
-        if: matrix.os == 'windows-latest'
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install Poetry (Windows only)
-        if: matrix.os == 'windows-latest'
+      - name: Install Poetry
         run: pip install poetry
 
-      - name: Install backend dependencies via Poetry (Windows only)
-        if: matrix.os == 'windows-latest'
+      - name: Install backend dependencies via Poetry
         working-directory: src/py-backend
         run: poetry install --no-root
 
-      - name: Build backend executable with PyInstaller (Windows only)
-        if: matrix.os == 'windows-latest'
+      - name: Build backend executable with PyInstaller
         working-directory: src/py-backend
         run: poetry run pyinstaller personalquery-backend.spec
         env:
-          LANGSMITH_TRACING: true
+          LANGSMITH_TRACING: false
           LANGSMITH_ENDPOINT: https://api.smith.langchain.com
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MY_OPENAI_API_KEY: ${{ secrets.MY_OPENAI_API_KEY }}
 
-      - name: Prevent interactive prompts (Windows only)
-        if: matrix.os == 'windows-latest'
+      - name: Prevent interactive prompts
         run: git config --global core.autocrlf input
 
       - name: Install dependencies (non-interactive)

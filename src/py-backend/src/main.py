@@ -12,10 +12,16 @@ IS_PACKAGED = hasattr(sys, "_MEIPASS")
 
 log_path = None
 if IS_PACKAGED:
-    appdata_dir = os.getenv("APPDATA", os.getcwd())
-    log_dir = os.path.join(appdata_dir, "personal-query", "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, "backend.log")
+    if sys.platform == "win32":
+        appdata_dir = os.getenv("APPDATA", os.getcwd())
+    elif sys.platform == "darwin":
+        appdata_dir = os.path.join(
+            os.path.expanduser("~"), "Library", "Application Support"
+        )
+    else:
+        appdata_dir = os.getenv(
+            "XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share")
+        )
 
 log_handlers = ["default"]
 if log_path:

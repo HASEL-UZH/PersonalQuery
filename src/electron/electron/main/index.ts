@@ -35,6 +35,8 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
   ? join(process.env.DIST_ELECTRON, '../public')
   : process.env.DIST;
 
+const backendBinary = process.platform === 'win32' ? 'pq-backend.exe' : 'pq-backend';
+
 const databaseService: DatabaseService = new DatabaseService();
 const settingsService: SettingsService = new SettingsService();
 const workScheduleService: WorkScheduleService = new WorkScheduleService();
@@ -88,7 +90,7 @@ app.whenReady().then(async () => {
 
   if (!isDev) {
     try {
-      const backendExePath = path.join(process.resourcesPath, 'pq-backend.exe');
+      const backendExePath = path.join(process.resourcesPath, backendBinary);
       LOG.info('[DEBUG] isDev = false');
       LOG.info('[DEBUG] Resolved backend exe path:', backendExePath);
 
@@ -96,7 +98,7 @@ app.whenReady().then(async () => {
       LOG.info('[DEBUG] File exists:', exists);
 
       if (!exists) {
-        throw new Error(`[pq-backend.exe] NOT FOUND at: ${backendExePath}`);
+        throw new Error(`[${backendBinary}] NOT FOUND at: ${backendExePath}`);
       }
       LOG.info(`Launching backend with PID placeholder`);
 
@@ -268,18 +270,7 @@ app.on('before-quit', async (event): Promise<void> => {
   if (backendProcess) {
     const pid = backendProcess.pid;
     LOG.info(`Killing backend process with PID: ${pid}`);
-
-    // Use taskkill to ensure subprocesses are killed
-    exec(`taskkill /PID ${pid} /T /F`, (err, stdout, stderr) => {
-      if (err) {
-        LOG.error(`taskkill error: ${err.message}`);
-        return;
-      }
-      if (stderr) {
-        LOG.error(`taskkill stderr: ${stderr}`);
-      }
-      LOG.info(`taskkill stdout: ${stdout}`);
-    });
+    treeKill(pid);
   }
   LOG.info('app.on(before-quit) called');
   if (!isAppQuitting) {

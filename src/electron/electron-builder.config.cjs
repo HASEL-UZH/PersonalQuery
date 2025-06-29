@@ -1,3 +1,5 @@
+const backendFile = process.platform === 'win32' ? 'pq-backend.exe' : 'pq-backend';
+
 module.exports = {
   productName: 'PersonalQuery',
   appId: 'ch.ifi.hasel.personalquery',
@@ -6,7 +8,7 @@ module.exports = {
     'node_modules/better_sqlite3/**',
     'node_modules/sqlite3/**',
     'node_modules/**/*.node',
-    'pq-backend.exe'
+    backendFile
   ],
   directories: {
     output: 'release/${version}'
@@ -15,15 +17,15 @@ module.exports = {
     'dist',
     'dist-electron',
     {
-      from: '../py-backend/dist/pq-backend.exe',
-      to: 'pq-backend.exe'
+      from: `../py-backend/dist/${backendFile}`,
+      to: backendFile
     },
     '!node_modules/uiohook-napi/build/**'
   ],
   extraResources: [
     {
-      from: '../py-backend/dist/pq-backend.exe',
-      to: 'pq-backend.exe',
+      from: `../py-backend/dist/${backendFile}`,
+      to: backendFile,
       filter: ['**/*']
     }
   ],
