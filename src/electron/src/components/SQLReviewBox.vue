@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, type PropType } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+
+interface ColumnDef {
+  field: string;
+  header: string;
+}
 
 const props = defineProps({
   query: { type: String, required: true },
   originalQuery: { type: String, required: true },
-  result: { type: Array, default: () => [] },
-  columns: { type: Array, default: () => [] },
-  filters: { type: Object, default: () => ({}) },
+  result: { type: Array as PropType<Record<string, any>[]>, default: () => [] },
+  columns: {
+    type: Array as PropType<ColumnDef[]>,
+    default: () => []
+  },
+  filters: { type: Object as PropType<Record<string, any>>, default: () => ({}) },
   loadingQuery: { type: Boolean, default: false },
   loadingResult: { type: Boolean, default: false },
   sqlError: { type: String, required: false, default: null }

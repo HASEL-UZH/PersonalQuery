@@ -749,14 +749,14 @@ onMounted(async () => {
         <div class="mb-4 flex w-full justify-center px-4">
           <SQLReviewBox
             v-if="needsSQLReview && index === wsMessages.length - 1"
-            :query="reviewMeta?.query"
-            :original-query="interruptionMeta?.query"
+            :query="reviewMeta?.query ?? ''"
+            :original-query="interruptionMeta?.query ?? ''"
             :result="reviewMeta?.data"
             :columns="approvalColumns"
             :filters="filters"
             :loading-query="loadingQuery"
             :loading-result="loadingResult"
-            :sql-error="sqlError"
+            :sql-error="sqlError ?? undefined"
             @reset-query="resetQuery"
             @execute-query="executeQuery"
             @correct-query="handleLLMCorrection"
