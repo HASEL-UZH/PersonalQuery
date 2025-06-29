@@ -73,6 +73,7 @@
     "marked-katex-extension": "^5.1.4",
     "node-schedule": "^2.1.1",
     "primevue": "^4.3.5",
+    "tailwindcss-primeui": "^0.6.1",
     "typeorm": "^0.3.20",
     "user-input-tracker": "file:PA.UserInputTracker/typescript",
     "vue-router": "^4.2.5",
