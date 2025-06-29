@@ -132,30 +132,6 @@ ORDER BY
 """.strip()
     },
     {
-        "feature": AggregationFeature.activity_category_ratio,
-        "sql_template": """
-SELECT
-  {time_grouping} AS {time_bucket},
-  ROUND(
-    SUM(CASE 
-          WHEN activity IN ({category_list}) THEN durationInSeconds 
-          ELSE 0 
-        END) * 1.0 /
-    SUM(durationInSeconds),
-    2
-  ) AS category_time_ratio
-FROM window_activity
-WHERE
-  {time_filter}
-  AND {additional_conditions}
-GROUP BY
-  time_bucket
-ORDER BY
-  time_bucket ASC;
-
-""".strip()
-    },
-    {
         "feature": AggregationFeature.work_related_typing,
         "sql_template": """
 SELECT

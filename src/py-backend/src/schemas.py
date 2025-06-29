@@ -145,10 +145,6 @@ class AggregationFeature(str, Enum):
         "user_input_by_app",
         description="Breaks down keystrokes, clicks, and mouse activity by app and activity category to show which apps required the most input effort. (Table: user_input, window_activity)"
     )
-    activity_category_ratio = Field(
-        "activity_category_ratio",
-        description="Computes the proportion of time spent in a specific set of activity categories versus total tracked time, useful for productivity-vs-leisure splits. (Table: window_activity)"
-    )
     work_related_typing = Field(
         "work_related_typing",
         description="Estimates how efficiently time was used for typing during work-related tasks, based on keystrokes per second. (Table: user_input, window_activity)"
