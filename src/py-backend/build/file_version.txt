@@ -13,7 +13,7 @@ VSVersionInfo(
   kids=[
     StringFileInfo([
       StringTable('040904B0', [
-        StringStruct('CompanyName', 'kauii'),
+        StringStruct('CompanyName', 'HASEL-UZH'),
         StringStruct('FileDescription', 'PersonalQuery: Backend'),
         StringStruct('FileVersion', '0.1.0'),
         StringStruct('ProductName', 'PersonalQuery'),

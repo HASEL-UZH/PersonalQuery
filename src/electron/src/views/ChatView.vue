@@ -161,7 +161,6 @@ async function fetchChatHistory() {
 
 onMounted(() => {
   connect();
-  handleNewChatGreeting();
   fetchChatHistory();
   window.addEventListener('newChatCreated', handleNewChatGreeting);
 });
@@ -508,7 +507,7 @@ function getDayClass(date: Date) {
 }
 
 function onConfirmSelection() {
-  let dateString = "";
+  let dateString = '';
 
   if (Array.isArray(selectedDate.value)) {
     const [start, end] = selectedDate.value;
@@ -517,12 +516,12 @@ function onConfirmSelection() {
     } else if (start) {
       dateString = formatDate(start);
     } else {
-      dateString = "No date selected";
+      dateString = 'No date selected';
     }
   } else if (selectedDate.value instanceof Date) {
     dateString = formatDate(selectedDate.value);
   } else {
-    dateString = "No date selected";
+    dateString = 'No date selected';
   }
 
   input.value = `${selectedQuestion.value}, ${dateString}`;
@@ -531,12 +530,11 @@ function onConfirmSelection() {
 
 function formatDate(d: unknown): string {
   if (d instanceof Date) {
-    const parts = d.toDateString().split(" ");
+    const parts = d.toDateString().split(' ');
     return `${parts[1]} ${parts[2]} ${parts[3]}`;
   }
-  return "Invalid date";
+  return 'Invalid date';
 }
-
 
 onMounted(async () => {
   const data = await typedIpcRenderer.invoke('getDataCoverageScore');
@@ -547,7 +545,7 @@ onMounted(async () => {
 
 <template>
   <div class="flex h-screen flex-col bg-base-100 p-4">
-    <div class="scrollable flex flex-col flex-1 overflow-y-auto space-y-4 pr-1">
+    <div class="scrollable flex flex-1 flex-col space-y-4 overflow-y-auto pr-1">
       <div
         v-if="greetingDisplayed"
         class="flex flex-grow items-center justify-center px-4 text-center"
@@ -566,10 +564,7 @@ onMounted(async () => {
             <button
               :key="q"
               @click="onSelectQuestion(q)"
-              :class="[
-    'btn',
-    selectedQuestion === q ? 'btn-primary' : 'btn-outline'
-  ]"
+              :class="['btn', selectedQuestion === q ? 'btn-primary' : 'btn-outline']"
             >
               {{ q }}
             </button>
@@ -1036,32 +1031,26 @@ onMounted(async () => {
     <dialog
       v-if="showDatePicker"
       class="modal modal-open"
-      @click.self="() => showDatePicker = false"
+      @click.self="() => (showDatePicker = false)"
     >
       <div
-        class="modal-box p-6 flex flex-col justify-between"
-        style="height: 600px; max-width: 32rem;"
+        class="modal-box flex flex-col justify-between p-6"
+        style="height: 600px; max-width: 32rem"
       >
         <div>
           <!-- Modal Title -->
-          <h2 class="text-lg font-semibold mb-2">
-            Select a Time Scope for the question:
-          </h2>
-          <p class="mb-2">
-            '{{ selectedQuestion }}'
-          </p>
+          <h2 class="mb-2 text-lg font-semibold">Select a Time Scope for the question:</h2>
+          <p class="mb-2">'{{ selectedQuestion }}'</p>
 
           <div class="mt-6">
-            <label class="block text-sm font-semibold mb-1">
-              Data Richness
-            </label>
+            <label class="mb-1 block text-sm font-semibold"> Data Richness </label>
             <!-- Gradient bar -->
             <div
-              class="w-full h-4 rounded"
-              style="background: linear-gradient(to right, white, #22c55e);"
+              class="h-4 w-full rounded"
+              style="background: linear-gradient(to right, white, #22c55e)"
             ></div>
             <!-- Labels -->
-            <div class="flex justify-between text-xs text-gray-600 mt-1">
+            <div class="mt-1 flex justify-between text-xs text-gray-600">
               <span>No Data</span>
               <span>High Coverage</span>
             </div>
@@ -1074,26 +1063,18 @@ onMounted(async () => {
             :day-class="getDayClass"
             :enable-time-picker="false"
             range
-            class="w-full flex-grow mt-2 mb-6"
+            class="mb-6 mt-2 w-full flex-grow"
           />
         </div>
 
         <!-- Confirm Button fixed at the bottom -->
         <div class="mt-4 text-right">
-          <button
-            v-if="selectedDate"
-            @click="onConfirmSelection"
-            class="btn btn-primary"
-          >
+          <button v-if="selectedDate" @click="onConfirmSelection" class="btn btn-primary">
             Confirm
           </button>
         </div>
       </div>
     </dialog>
-
-
-
-
 
     <!-- Plot Modal -->
     <dialog v-if="showImageModal" class="modal modal-open" @click.self="closeImageModal">
@@ -1273,6 +1254,4 @@ input[type='number'] {
   border-radius: 4px;
   color: inherit;
 }
-
-
 </style>

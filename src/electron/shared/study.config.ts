@@ -4,7 +4,7 @@ const studyConfig: StudyConfiguration = {
   name: 'PersonalQuery Study',
   shortDescription:
     'PersonalQuery, an extension of the PersonalAnalytics tool that integrates an LLM to enable NL querying of personal activity data.',
-  infoUrl: 'https://github.com/kauii/PersonalQuery',
+  infoUrl: 'https://github.com/HASEL-UZH/PersonalQuery',
   privacyPolicyUrl:
     'https://github.com/HASEL-UZH/PersonalAnalytics/blob/dev-am/documentation/PRIVACY.md',
   uploadUrl: 'https://hasel.dev/upload',

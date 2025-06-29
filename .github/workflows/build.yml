@@ -52,8 +52,8 @@ jobs:
           LANGSMITH_ENDPOINT: https://api.smith.langchain.com
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: personalQuery
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MY_OPENAI_API_KEY: ${{ secrets.MY_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.HASEL_API_KEY }}
+          MY_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Prevent interactive prompts
         run: git config --global core.autocrlf input

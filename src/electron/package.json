@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kauii/PersonalQuery"
+    "url": "https://github.com/HASEL-UZH/PersonalQuery"
   },
   "devDependencies": {
     "@electron/notarize": "^2.3.0",
@@ -76,10 +76,10 @@
     "primeicons": "^7.0.0",
     "primevue": "^4.3.5",
     "tailwindcss-primeui": "^0.6.1",
+    "tree-kill": "^1.2.2",
     "typeorm": "^0.3.20",
     "user-input-tracker": "file:PA.UserInputTracker/typescript",
     "vue-router": "^4.2.5",
-    "windows-activity-tracker": "file:PA.WindowsActivityTracker/typescript",
-    "tree-kill": "^1.2.2"
+    "windows-activity-tracker": "file:PA.WindowsActivityTracker/typescript"
   }
 }

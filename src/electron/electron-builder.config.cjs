@@ -31,7 +31,7 @@ module.exports = {
   ],
   publish: {
     provider: 'github',
-    owner: 'kauii',
+    owner: 'HASEL-UZH',
     repo: 'PersonalQuery'
   },
   afterSign: 'scripts/notarize.cjs',
