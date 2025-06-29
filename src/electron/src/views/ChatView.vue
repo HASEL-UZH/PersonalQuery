@@ -120,6 +120,7 @@ const handleNewChatGreeting = () => {
   if (wsMessages.value.length === 0) {
     greetingDisplayed.value = true;
     fullGreeting.value = mainGreetings[Math.floor(Math.random() * mainGreetings.length)];
+    randomSuggestedQuestions.value = suggestedQuestions.sort(() => Math.random() - 0.5).slice(0, 3);
     simulateGreetingStream(fullGreeting.value);
   }
 };
@@ -487,10 +488,24 @@ const selectedDate = ref<Date | [Date, Date] | null>(null);
 const coverageScores = ref<Record<string, number>>({});
 
 const suggestedQuestions = [
-  'Show me where I spent the most time',
-  'Analyze my typing activity',
-  'Compare my focus between categories'
+  'How many times do I switch between apps?',
+  'How much time do I spend coding?',
+  'How much time do I spend in the browser?',
+  'Which activities do I spend the most time on?',
+  'On which day of the week do I code the most?',
+  'Which activities are associated with high mouse activity?',
+  'How does my perceived productivity compare across different activities?',
+  'How often do I switch from work to non-work activities?',
+  'How has my productivity changed?',
+  'Which activities have the longest total focus time?',
+  'What patterns exist in my typing activity?',
+  'Which applications do I type in the most?',
+  'Which activities generate the most user input?',
+  'How does my input relate to my self-perceived productivity ratings?',
+  'How does time spent on activities relate to feeling productive?'
 ];
+
+const randomSuggestedQuestions = ref<string[]>([]);
 
 function onSelectQuestion(q: string) {
   selectedQuestion.value = q;
@@ -560,11 +575,11 @@ onMounted(async () => {
       >
         <h3 class="mb-4 text-lg font-semibold">Quick Start</h3>
         <ul class="flex flex-wrap gap-10">
-          <li v-for="q in suggestedQuestions" :key="q">
+          <li v-for="q in randomSuggestedQuestions" :key="q">
             <button
               :key="q"
-              @click="onSelectQuestion(q)"
               :class="['btn', selectedQuestion === q ? 'btn-primary' : 'btn-outline']"
+              @click="onSelectQuestion(q)"
             >
               {{ q }}
             </button>
@@ -1069,7 +1084,7 @@ onMounted(async () => {
 
         <!-- Confirm Button fixed at the bottom -->
         <div class="mt-4 text-right">
-          <button v-if="selectedDate" @click="onConfirmSelection" class="btn btn-primary">
+          <button  :disabled="!selectedDate "class="btn btn-primary" @click="onConfirmSelection">
             Confirm
           </button>
         </div>
