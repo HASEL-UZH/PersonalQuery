@@ -6,7 +6,7 @@ from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown, split_result
 from helper.sql_aggregations import aggregation_sql_templates
 from llm_registry import LLMRegistry
-from schemas import State, QueryOutput, AdjustQueryDecision, TimeScope, Activity
+from schemas import State, QueryOutput, AdjustQueryDecision, TimeGrouping, Activity, TimeFilter, AggregationFeature
 
 load_env()
 
@@ -96,35 +96,43 @@ def check_query_adjustment(state: State) -> State:
     return state
 
 
-def group_based_on_time_scope(ts: TimeScope):
+def group_based_on_time_scope(ts: TimeGrouping):
     if ts == ts.session:
         return ""
     if ts == ts.day:
-        return "**Try to group by hours or sessions.**"
+        return "- Use the time grouping: **by hours or sessions **if session table is used as well**.**"
     if ts == ts.week:
-        return "**Try to group by days.**"
+        return "- Use the time grouping: **by days**"
     if ts == ts.month:
-        return "**Try to group by weeks.**"
+        return "- Use the time grouping: **by weeks**"
+
+
+def get_time_filter_prompt(tf: TimeFilter):
+    if tf.type == "single":
+        return tf.date
+    elif tf.type == "range":
+        return f"From: {tf.from_date}, To: {tf.to_date}"
+    elif tf.type == "multiple":
+        return ", ".join(str(d) for d in tf.dates)
+    return "No time filter applicable."
 
 
 def query_chain(llm: ChatOpenAI):
     def select_template(state: State):
         insight_mode = state.get('insight_mode', "descriptive")
-        aggregation_features = state.get("aggregation_feature")
+        feature: AggregationFeature = state.get("aggregation_feature")
 
-        if aggregation_features:
+        if feature:
             aggregation_hint = (
-                    "- Use the following aggregation SQL templates to help write your query:\n\n"
-                    + "\n\n---\n\n".join(
-                f"-- Feature: {feature}\n{aggregation_template_map[feature]}"
-                for feature in aggregation_features
-                if feature in aggregation_template_map
-            )
+                    "- Use the following aggregation SQL template to help write your query:\n\n"
+                    + f"-- Feature: {feature.name}\n{aggregation_template_map[feature]}"
+                    + "\n\nUse an appropriate column alias for the `{time_bucket}` (e.g., if time grouping is hours, name the column `hour`; if days, name it `day`, etc.)."
             )
         else:
             aggregation_hint = ""
 
-        group_by = group_based_on_time_scope(state.get('time_scope', TimeScope.day))
+        group_by = group_based_on_time_scope(state.get('time_grouping', TimeGrouping.day))
+        time_filter = get_time_filter_prompt(state.get('time_filter'))
 
         if insight_mode == "diagnostic":
             template = diagnostic_template
@@ -141,7 +149,8 @@ def query_chain(llm: ChatOpenAI):
             "table_info": get_custom_table_info(state),
             "question": state["question"],
             "aggregation_hint": aggregation_hint,
-            "group_by": group_by
+            "timeGrouping": group_by,
+            "timeFilter": time_filter
         })
 
     return (

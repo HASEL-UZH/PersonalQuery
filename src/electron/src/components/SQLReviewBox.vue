@@ -59,11 +59,11 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
       </div>
 
       <div v-else>
-    <textarea
-      v-model="editableQuery"
-      rows="16"
-      class="textarea textarea-bordered w-full font-mono"
-    />
+        <textarea
+          v-model="editableQuery"
+          rows="16"
+          class="textarea textarea-bordered w-full font-mono"
+        />
       </div>
 
       <div class="flex gap-4">
@@ -72,24 +72,38 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
           @click="() => (editableQuery = originalQuery)"
           data-tip="Reset Query"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="size-5"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+            />
           </svg>
         </button>
 
-        <button
-          class="btn btn-primary btn-sm tooltip"
-          @click="handleExecute"
-          data-tip="Execute"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
+        <button class="btn btn-primary btn-sm tooltip" @click="handleExecute" data-tip="Execute">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="size-6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z"
+            />
           </svg>
-
-
-
         </button>
-
       </div>
 
       <!-- Spacer to push correction section to bottom (optional for layout control) -->
@@ -97,7 +111,7 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
 
       <!-- Correction Section -->
       <div class="mt-4">
-        <h3 class="text-sm text-gray-500 mb-1">
+        <h3 class="mb-1 text-sm text-gray-500">
           Want to improve or fix the query? Describe what you’d like to change:
         </h3>
         <div class="flex w-full">
@@ -108,21 +122,28 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             class="input input-sm input-bordered w-full rounded-r-none focus:outline-none focus:ring-0"
             @keydown.enter.prevent="emitCorrection"
           />
-          <button
-            class="btn btn-sm btn-primary rounded-l-none border"
-            @click="emitCorrection"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+          <button class="btn btn-primary btn-sm rounded-l-none border" @click="emitCorrection">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="size-5"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
+              />
             </svg>
           </button>
         </div>
       </div>
     </div>
 
-
     <!-- Right Box: Result -->
-    <div class="flex flex-1 max-w-4xl flex-col gap-4 rounded-xl bg-base-200 p-6">
+    <div class="flex max-w-4xl flex-1 flex-col gap-4 rounded-xl bg-base-200 p-6">
       <h2 class="text-xl font-semibold">Current Data</h2>
 
       <div class="min-h-[12rem] rounded bg-base-100 p-4 text-sm">
@@ -130,7 +151,10 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
           <span class="loading loading-spinner loading-sm"></span>
           executing query...
         </p>
-        <p v-else-if="sqlError" class="p-4 bg-error border border-error-content text-error-content rounded-md text-sm">
+        <p
+          v-else-if="sqlError"
+          class="rounded-md border border-error-content bg-error p-4 text-sm text-error-content"
+        >
           <strong class="mb-1 block font-medium">SQL Error:</strong>
           {{ sqlError }}
         </p>
@@ -153,7 +177,9 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
             }"
           >
             <template #header>
-              <div class="custom-datatable-header flex items-center justify-between gap-4 pr-0 mb-4">
+              <div
+                class="custom-datatable-header mb-4 flex items-center justify-between gap-4 pr-0"
+              >
                 <span class="ml-auto">
                   <input
                     v-model="globalSearch"

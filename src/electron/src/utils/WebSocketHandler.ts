@@ -7,6 +7,7 @@ export interface Meta {
   result: Record<string, any>[];
   plotPath: string | undefined;
   plotBase64: string | undefined;
+  fbSubmitted: boolean;
 }
 
 export type Role = 'system' | 'ai' | 'human';
@@ -35,82 +36,92 @@ export function useChatWebSocket() {
   } | null>(null);
   const partialMessages = new Map<string, string>();
 
-  const connect = () => {
-    socket.value = new WebSocket('ws://localhost:8000/ws');
+  const connect = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket('ws://localhost:8000/ws');
 
-    socket.value.onopen = () => {
-      isConnected.value = true;
-    };
+      ws.onopen = () => {
+        console.log('WebSocket connection established.');
+        isConnected.value = true;
+        socket.value = ws;
+        resolve();
+      };
 
-    socket.value.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type != 'chunk'){
-        console.log("data received:", data);
-      }
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        reject(err);
+      };
 
+      ws.onclose = () => {
+        isConnected.value = false;
+        console.log('WebSocket connection closed.');
+      };
 
-      if (data.type === 'step') {
-        steps.value = [data.node];
-      } else if (data.type === 'interruption') {
-        steps.value = [];
-        interruptionMeta.value = {
-          query: data.query,
-          data: data.data,
-          chat_id: data.chat_id,
-          reason: {
-            auto_approve: data.reason.auto_approve,
-            auto_sql: data.reason.auto_sql
-          }
-        };
-      } else if (data.type === 'chunk') {
-        const { id, content } = data;
-        if (!partialMessages.has(id)) {
-          const partialMessage: Message = {
-            id,
-            role: 'ai',
-            content: content
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type !== 'chunk') {
+          console.log('Data received:', data);
+        }
+
+        if (data.type === 'step') {
+          steps.value = [data.node];
+        } else if (data.type === 'interruption') {
+          steps.value = [];
+          interruptionMeta.value = {
+            query: data.query,
+            data: data.data,
+            chat_id: data.chat_id,
+            reason: {
+              auto_approve: data.reason.auto_approve,
+              auto_sql: data.reason.auto_sql
+            }
           };
-          messages.value.push(partialMessage);
-          partialMessages.set(id, content);
-        } else {
-          partialMessages.set(id, content);
+        } else if (data.type === 'chunk') {
+          const { id, content } = data;
+          if (!partialMessages.has(id)) {
+            const partialMessage: Message = {
+              id,
+              role: 'ai',
+              content
+            };
+            messages.value.push(partialMessage);
+            partialMessages.set(id, content);
+          } else {
+            partialMessages.set(id, content);
+            const msgIndex = messages.value.findIndex((m) => m.id === id);
+            if (msgIndex !== -1) {
+              messages.value[msgIndex].content = content;
+            }
+          }
+        } else if (data.role === 'ai') {
+          const { id, content, additional_kwargs } = data;
           const msgIndex = messages.value.findIndex((m) => m.id === id);
           if (msgIndex !== -1) {
-            messages.value[msgIndex].content = content;
+            messages.value[msgIndex] = {
+              id,
+              role: 'ai',
+              content,
+              meta: additional_kwargs?.meta
+            };
+          } else {
+            messages.value.push({
+              id,
+              role: 'ai',
+              content,
+              meta: additional_kwargs?.meta
+            });
           }
+          partialMessages.delete(id);
+          if (onFinalResponse.value) {
+            onFinalResponse.value();
+          }
+          steps.value = [];
         }
-      } else if (data.role === 'ai') {
-        const { id, content, additional_kwargs } = data;
-        const msgIndex = messages.value.findIndex((m) => m.id === id);
-        if (msgIndex !== -1) {
-          messages.value[msgIndex] = {
-            id,
-            role: 'ai',
-            content,
-            meta: additional_kwargs?.meta
-          };
-        } else {
-          messages.value.push({
-            id,
-            role: 'ai',
-            content,
-            meta: additional_kwargs?.meta
-          });
-        }
-        partialMessages.delete(id);
-        if (onFinalResponse.value) {
-          onFinalResponse.value();
-        }
-        steps.value = [];
-      }
-    };
-
-    socket.value.onclose = () => {
-      isConnected.value = false;
-    };
+      };
+    });
   };
 
-  const send = (
+  const send = async (
     question: string,
     chatId: string,
     options?: {
@@ -136,14 +147,13 @@ export function useChatWebSocket() {
 
     if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not open. Reconnecting...');
-      connect();
-      setTimeout(() => {
-        if (socket.value?.readyState === WebSocket.OPEN) {
-          socket.value.send(payload);
-        } else {
-          console.error('WebSocket still not open after reconnect.');
-        }
-      }, 300);
+      try {
+        await connect();
+        console.log('WebSocket reconnected, sending payload.');
+        socket.value?.send(payload);
+      } catch (err) {
+        console.error('WebSocket reconnect failed:', err);
+      }
     } else {
       socket.value.send(payload);
     }
@@ -156,7 +166,6 @@ export function useChatWebSocket() {
     }
   };
 
-
   return {
     connect,
     send,
@@ -165,6 +174,6 @@ export function useChatWebSocket() {
     steps,
     isConnected,
     onFinalResponse,
-    interruptionMeta: interruptionMeta
+    interruptionMeta
   };
 }

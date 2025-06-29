@@ -6,7 +6,7 @@ from helper.answer_utils import convert_bracket_to_dollar_latex
 from helper.chat_utils import replace_or_insert_system_prompt
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry
-from schemas import State, WantsPlot, AnswerDetail
+from schemas import State, AnswerDetail
 from langchain_openai import ChatOpenAI
 
 load_env()
@@ -18,6 +18,11 @@ diagnostic_template = hub.pull("answer-diagnostic")
 predictive_template = hub.pull("answer-predictive")
 prescriptive_template = hub.pull("answer-prescriptive")
 descriptive_template = hub.pull("answer-descriptive")
+
+diagnostic_template_plot = hub.pull("answer-diagnostic-plot")
+predictive_template_plot = hub.pull("answer-predictive-plot")
+prescriptive_template_plot = hub.pull("answer-prescriptive-plot")
+descriptive_template_plot = hub.pull("answer-descriptive-plot")
 
 prompt_template_general = hub.pull("general_answer")
 
@@ -43,19 +48,31 @@ async def generate_answer(state: State, config: dict) -> State:
     insight_mode = state["insight_mode"]
     ws = config.get("configurable", {}).get("websocket")
 
-    if insight_mode == "diagnostic":
-        template = diagnostic_template
-    elif insight_mode == "predictive":
-        template = predictive_template
-    elif insight_mode == "prescriptive":
-        template = prescriptive_template
-    else:
-        template = descriptive_template
-
-    if state['wants_plot'] != WantsPlot.NO and len(state['plot_base64']) > 0:
-        plot = "- A plot has been created and will be displayed as well."
+    code = state['plot_code']
+    if code:
+        plot = (
+                "- The following visualization code was executed to create a plot:\n\n"
+                + code
+                + "\n\nPlease do not repeat all the details of the data that is used in the plot"
+        )
+        if insight_mode == "diagnostic":
+            template = diagnostic_template_plot
+        elif insight_mode == "predictive":
+            template = predictive_template_plot
+        elif insight_mode == "prescriptive":
+            template = prescriptive_template_plot
+        else:
+            template = descriptive_template_plot
     else:
         plot = ""
+        if insight_mode == "diagnostic":
+            template = diagnostic_template
+        elif insight_mode == "predictive":
+            template = predictive_template
+        elif insight_mode == "prescriptive":
+            template = prescriptive_template
+        else:
+            template = descriptive_template
 
     granularity_instruction = {
         AnswerDetail.HIGH: "- Provide a detailed response that remains relevant and focused.",
@@ -67,7 +84,7 @@ async def generate_answer(state: State, config: dict) -> State:
         "question": state["question"],
         "result": state["result"],
         "query": state["query"],
-        "plot": plot,
+        "plot_code": plot,
         "granularity_instruction": granularity_instruction
     })
 
@@ -88,7 +105,8 @@ async def generate_answer(state: State, config: dict) -> State:
         if isinstance(chunk, AIMessageChunk):
             final_msg = chunk if final_msg.content == "" else final_msg + chunk
             if ws:
-                await ws.send_json({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content), "id": final_msg.id})
+                await ws.send_json({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content),
+                                    "id": final_msg.id})
     """""
     final_msg2 = AIMessage(content="")
     async for chunk in stream2:
@@ -106,11 +124,12 @@ async def generate_answer(state: State, config: dict) -> State:
         additional_kwargs={
             "meta": {
                 "tables": state["tables"],
-                "activities": state["activities"],
+                "activities": [a.name for a in state.get("activities") or []],
                 "query": state["query"],
                 "result": state["raw_result"],
                 "plotPath": state.get('plot_path', ""),
-                "plotBase64": state.get('plot_base64', "")
+                "plotBase64": state.get('plot_base64', ""),
+                "fbSubmitted": False
             }
         }
     ))

@@ -60,6 +60,13 @@ interface Review {
   query: string;
 }
 
+interface Feedback {
+  messageId: string;
+  dataCorrect: 'yes' | 'no' | null;
+  questionAnswered: 'yes' | 'no' | null;
+  comment: string;
+}
+
 marked.use(markedKatex());
 
 function formatMessage(message: string) {
@@ -83,7 +90,8 @@ const currentMeta = ref<Meta>({
   query: '',
   result: [],
   plotPath: '',
-  plotBase64: ''
+  plotBase64: '',
+  fbSubmitted: false
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
@@ -133,6 +141,7 @@ async function fetchChatHistory() {
   const fetchedMessages: Message[] = data.messages
     .filter((msg: Message) => msg.role !== 'system')
     .map((msg: any) => ({
+      id: msg.id,
       role: msg.role,
       content: msg.content,
       meta: msg.meta || msg.additional_kwargs?.meta
@@ -286,6 +295,44 @@ const sendApproval = async (chatId: string, approval: boolean, data: any) => {
   }
 };
 
+const feedbackStates = ref<Record<string, Feedback>>({});
+const submittedFeedbacks = ref<Set<string>>(new Set());
+
+function getFeedbackState(messageId: string): Feedback {
+  if (!feedbackStates.value[messageId]) {
+    feedbackStates.value[messageId] = {
+      messageId,
+      dataCorrect: null,
+      questionAnswered: null,
+      comment: ''
+    };
+  }
+  return feedbackStates.value[messageId];
+}
+
+const submitFeedback = async (chatId: string, feedback: Feedback) => {
+  try {
+    const res = await fetch('http://localhost:8000/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: feedback.messageId,
+        data_correct: feedback.dataCorrect === 'yes' ? 1 : 0,
+        question_answered: feedback.questionAnswered === 'yes' ? 1 : 0,
+        comment: feedback.comment || ''
+      })
+    });
+
+    const result = await res.json();
+    console.log('Feedback submitted:', result);
+    console.log('Adding msg to submitted feedbacks:', feedback.messageId)
+    submittedFeedbacks.value.add(feedback.messageId);
+  } catch (err) {
+    console.error('Failed to send feedback:', err);
+  }
+};
+
 function respondToApproval(approval: boolean) {
   if (reviewMeta.value?.chat_id) {
     sendApproval(reviewMeta.value.chat_id, approval, reviewMeta.value.data);
@@ -348,9 +395,7 @@ async function executeQuery(finalQuery: string) {
     if (result) {
       if (result.error) {
         sqlError.value = result.error;
-      }
-
-      else if (reviewMeta.value) {
+      } else if (reviewMeta.value) {
         reviewMeta.value.data = result;
       }
     }
@@ -363,8 +408,8 @@ async function executeQuery(finalQuery: string) {
 }
 
 function resetQuery() {
-  console.log("resetting:", reviewMeta.value?.query)
-  console.log("with:", interruptionMeta.value?.query)
+  console.log('resetting:', reviewMeta.value?.query);
+  console.log('with:', interruptionMeta.value?.query);
   if (reviewMeta.value) {
     reviewMeta.value.query = interruptionMeta.value!.query;
   }
@@ -418,7 +463,7 @@ async function handleProceedAfterSQL() {
 
     const result = await res.json();
     if (result && result.role === 'ai' && result.content) {
-      console.log("IM IN HEREEEE")
+      console.log('IM IN HEREEEE');
       wsMessages.value.push({
         role: result.role,
         content: result.content,
@@ -426,8 +471,6 @@ async function handleProceedAfterSQL() {
       });
       reviewMeta.value = null;
     }
-
-
   } catch (err) {
     console.error('Failed to confirm SQL with backend:', err);
   }
@@ -481,6 +524,90 @@ async function handleProceedAfterSQL() {
               class="mt-4 max-h-[500px] w-full cursor-pointer rounded-lg border border-white/20 object-contain shadow transition"
               @click="openImageModal(msg.meta.plotBase64)"
             />
+
+            <div
+              v-if="msg.meta && msg.id"
+              class="mt-4 flex flex-col border-t border-white/10 pt-4 text-sm"
+            >
+              <div v-if="submittedFeedbacks.has(msg.id) || msg.meta.fbSubmitted" class="mt-2 text-success font-semibold">
+                Feedback saved!
+              </div>
+              <div v-else class="flex flex-row gap-4">
+                <div>
+                  <span class="font-semibold">Was the correct data retrieved?</span>
+                  <div class="mt-1 flex gap-2">
+                    <button
+                      class="btn btn-xs"
+                      :class="{ 'btn-success': getFeedbackState(msg.id).dataCorrect === 'yes' }"
+                      @click="getFeedbackState(msg.id).dataCorrect = 'yes'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
+                        <path d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z" />
+                      </svg>
+
+                    </button>
+                    <button
+                      class="btn btn-xs"
+                      :class="{ 'btn-error': getFeedbackState(msg.id).dataCorrect === 'no' }"
+                      @click="getFeedbackState(msg.id).dataCorrect = 'no'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
+                        <path d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z" />
+                      </svg>
+
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span class="font-semibold">Did this answer your question?</span>
+                  <div class="mt-1 flex gap-2">
+                    <button
+                      class="btn btn-xs"
+                      :class="{
+                        'btn-success': getFeedbackState(msg.id).questionAnswered === 'yes'
+                      }"
+                      @click="getFeedbackState(msg.id).questionAnswered = 'yes'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
+                        <path d="M2.09 15a1 1 0 0 0 1-1V8a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1ZM5.765 13H4.09V8c.663 0 1.218-.466 1.556-1.037a4.02 4.02 0 0 1 1.358-1.377c.478-.292.907-.706.989-1.26V4.32a9.03 9.03 0 0 0 0-2.642c-.028-.194.048-.394.224-.479A2 2 0 0 1 11.09 3c0 .812-.08 1.605-.235 2.371a.521.521 0 0 0 .502.629h1.733c1.104 0 2.01.898 1.901 1.997a19.831 19.831 0 0 1-1.081 4.788c-.27.747-.998 1.215-1.793 1.215H9.414c-.215 0-.428-.035-.632-.103l-2.384-.794A2.002 2.002 0 0 0 5.765 13Z" />
+                      </svg>
+
+                    </button>
+                    <button
+                      class="btn btn-xs"
+                      :class="{ 'btn-error': getFeedbackState(msg.id).questionAnswered === 'no' }"
+                      @click="getFeedbackState(msg.id).questionAnswered = 'no'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
+                        <path d="M10.325 3H12v5c-.663 0-1.219.466-1.557 1.037a4.02 4.02 0 0 1-1.357 1.377c-.478.292-.907.706-.989 1.26v.005a9.031 9.031 0 0 0 0 2.642c.028.194-.048.394-.224.479A2 2 0 0 1 5 13c0-.812.08-1.605.234-2.371a.521.521 0 0 0-.5-.629H3C1.896 10 .99 9.102 1.1 8.003A19.827 19.827 0 0 1 2.18 3.215C2.45 2.469 3.178 2 3.973 2h2.703a2 2 0 0 1 .632.103l2.384.794a2 2 0 0 0 .633.103ZM14 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1Z" />
+                      </svg>
+
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <textarea
+                    v-model="getFeedbackState(msg.id).comment"
+                    class="textarea textarea-bordered mt-2 w-full"
+                    placeholder="Additional comments (optional)"
+                    rows="2"
+                  ></textarea>
+                </div>
+
+                <button
+                  class="btn btn-primary btn-sm mt-2 self-start"
+                  :disabled="
+                    !getFeedbackState(msg.id).dataCorrect ||
+                    !getFeedbackState(msg.id).questionAnswered
+                  "
+                  @click="submitFeedback(chatId, getFeedbackState(msg.id))"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            </div>
 
             <!-- Optional metadata info button -->
             <button

@@ -1,12 +1,16 @@
 import asyncio
 import logging
 import os
+import sqlite3
+import uuid
+
 import aiosqlite
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Dict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, END, StateGraph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -82,6 +86,19 @@ async def initialize():
                 last_activity TEXT
             )
         """)
+        await setup_conn.commit()
+        await setup_conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id TEXT PRIMARY KEY,
+                    thread_id TEXT,
+                    message_id TEXT,
+                    message_content TEXT,
+                    data_correct INTEGER,
+                    question_answered INTEGER,
+                    comment TEXT,
+                    created_at TEXT
+                )
+            """)
         await setup_conn.commit()
 
     # Then, create a separate connection just for the checkpointer
@@ -362,7 +379,6 @@ async def update_sql_data(chat_id: str, query, data, websocket):
         return {"error": "resume failed"}
 
 
-
 async def get_chat_history(chat_id: str) -> Dict:
     config = {"configurable": {"thread_id": chat_id}}
     try:
@@ -375,7 +391,7 @@ async def get_chat_history(chat_id: str) -> Dict:
         if isinstance(msg, HumanMessage):
             result.append({"role": "human", "content": msg.content})
         elif isinstance(msg, AIMessage):
-            result.append({"role": "ai", "content": msg.content, "additional_kwargs": msg.additional_kwargs})
+            result.append({"role": "ai", "content": msg.content, "additional_kwargs": msg.additional_kwargs, "id": msg.id})
         elif isinstance(msg, SystemMessage):
             result.append({"role": "system", "content": msg.content})
 
@@ -425,3 +441,55 @@ async def rename_chat(chat_id: str, new_title: str):
         return {"status": f"Chat title updated to '{new_title.strip()}'"}
     except Exception as e:
         return {"error": f"An error occurred: {str(e)}"}
+
+
+async def store_feedback(chat_id, msg_id, data_correct, question_answered, comment):
+    config: RunnableConfig = {"configurable": {"thread_id": chat_id}}
+    try:
+        snapshot = await graph.aget_state(config)
+        messages = snapshot.values.get("messages", [])
+    except Exception:
+        return {"error": "Chat not found"}
+
+    targetted_msg = None
+    for msg in messages:
+        if msg.id == msg_id and isinstance(msg, AIMessage):
+            targetted_msg = msg
+            break
+    if not targetted_msg:
+        return {"error": "Message not found."}
+
+    feedback_id = str(uuid.uuid4())
+    created_at = datetime.now(UTC).isoformat()
+    content = targetted_msg.content
+
+    conn = sqlite3.connect(str(CHECKPOINT_DB_PATH), check_same_thread=False)
+    cursor = conn.cursor()
+
+    meta = targetted_msg.additional_kwargs.get("meta", {})
+    meta["fbSubmitted"] = True
+    targetted_msg.additional_kwargs["meta"] = meta
+
+    await graph.aupdate_state(config, {'messages': messages})
+
+    cursor.execute("""
+            INSERT INTO feedback (
+                id, thread_id, message_id, message_content,
+                data_correct, question_answered, comment, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+        feedback_id,
+        chat_id,
+        msg_id,
+        content,
+        data_correct,
+        question_answered,
+        comment,
+        created_at
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "feedback_id": feedback_id}

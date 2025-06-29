@@ -34,10 +34,12 @@ def get_scope(state: State) -> State:
 
     prompt = prompt_template.invoke({
         "question": state['question'],
-        "tables": state['tables']
+        "tables": state['tables'],
+        "current_time": state['current_time']
     })
 
     parsed = llm.with_structured_output(QueryScope).invoke(prompt)
     state["aggregation_feature"] = parsed.aggregationFeature
-    state["time_scope"] = parsed.timeScope
+    state["time_grouping"] = parsed.timeGrouping
+    state["time_filter"] = parsed.timeFilter
     return state

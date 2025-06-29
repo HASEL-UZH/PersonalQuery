@@ -6,7 +6,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from chains.query_chain import correct_query, execute_corrected_query
-from chat_engine import run_chat, get_chat_history, initialize, delete_chat, rename_chat, resume_stream, update_sql_data
+from chat_engine import run_chat, get_chat_history, initialize, delete_chat, rename_chat, resume_stream, \
+    update_sql_data, store_feedback
 from database import DB_PATH
 from helper.chat_utils import get_next_thread_id, list_chats
 from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
@@ -146,8 +147,6 @@ async def confirm_query(request: Request):
     return msg
 
 
-
-
 @app.post("/initialize-data")
 def initialize_data():
     try:
@@ -157,6 +156,18 @@ def initialize_data():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+
+@app.post("/feedback")
+async def submit_feedback(request: Request):
+    payload = await request.json()
+    chat_id = payload.get("chat_id")
+    msg_id = payload.get("message_id")
+    data_correct = payload.get("data_correct")
+    question_answered = payload.get("question_answered")
+    comment = payload.get("comment")
+
+    status = await store_feedback(chat_id, msg_id, data_correct, question_answered, comment)
+    return status
 
 @app.get("/health")
 def health_check():

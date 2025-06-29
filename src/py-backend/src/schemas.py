@@ -1,9 +1,10 @@
 from enum import Enum
-from typing import List, Literal, Optional, Callable, Awaitable
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict, Annotated
 from langchain_core.messages import BaseMessage
+from datetime import date
 
 
 class QueryOutput(TypedDict):
@@ -87,8 +88,6 @@ class ActivityFilterList(BaseModel):
     )
 
 
-
-
 class WantsPlot(str, Enum):
     YES = "YES"
     NO = "NO"
@@ -130,10 +129,6 @@ class AggregationFeature(str, Enum):
         "total_focus_time",
         description="Calculates the total time spent per app and activity, helping identify where most focused attention was directed. (Table: window_activity)"
     )
-    category_buckets = Field(
-        "category_buckets",
-        description="Summarizes total time spent in each activity category (e.g., Work, Planning, Other) to show high-level behavioral distribution. (Table: window_activity)"
-    )
     input_activity_volume = Field(
         "input_activity_volume",
         description="Aggregates raw input metrics such as total keystrokes, clicks, mouse movement, and scroll distance to quantify overall interaction volume. (Table: user_input)"
@@ -150,35 +145,63 @@ class AggregationFeature(str, Enum):
         "user_input_by_app",
         description="Breaks down keystrokes, clicks, and mouse activity by app and activity category to show which apps required the most input effort. (Table: user_input, window_activity)"
     )
-    typing_density = Field(
-        "typing_density",
-        description="Calculates average keystrokes per second across the selected period, capturing intensity of typing activity. (Table: user_input)"
-    )
     activity_category_ratio = Field(
         "activity_category_ratio",
         description="Computes the proportion of time spent in a specific set of activity categories versus total tracked time, useful for productivity-vs-leisure splits. (Table: window_activity)"
     )
-    typing_productivity = Field(
-        "typing_productivity",
-        description="Estimates how efficiently time was used for productive typing during focus-related activities, based on keystrokes per second. (Table: user_input, window_activity)"
+    work_related_typing = Field(
+        "work_related_typing",
+        description="Estimates how efficiently time was used for typing during work-related tasks, based on keystrokes per second. (Table: user_input, window_activity)"
+    )
+    input_activity_by_productivity = Field(
+        "input_activity_by_productivity",
+        description="User input activities linked to productivity (Tables: session, user_input)"
+    )
+    activity_time_by_productivity = Field(
+        "activity_time_by_productivity",
+        description="Window activities linked to productivity (Tables: session, window_activity)"
+    )
+    session_activity_input_summary = Field(
+        "session_activity_input_summary",
+        description="Summary report, links Window activities and User input activities to productivity (Tables: session, window_activity, user_input)"
     )
 
 
-class TimeScope(str, Enum):
+class TimeGrouping(str, Enum):
     session = "session"
     day = "day"
     week = "week"
     month = "month"
 
 
+class SingleDate(BaseModel):
+    type: Literal["single"]
+    date: date
+
+
+class DateRange(BaseModel):
+    type: Literal["range"]
+    from_date: date
+    to_date: date
+
+
+class MultipleDates(BaseModel):
+    type: Literal["multiple"]
+    dates: List[date]
+
+
+TimeFilter = Union[SingleDate, DateRange, MultipleDates]
+
+
 class QueryScope(BaseModel):
-    aggregationFeature: Optional[List[AggregationFeature]] = Field(
+    aggregationFeature: Optional[AggregationFeature] = Field(
         default=None,
-        description="One or more behavioral metrics to aggregate from high-volume tables like 'window_activity' or 'user_input'."
+        description="One behavioral metric to aggregate from high-volume tables like 'window_activity' or 'user_input'."
     )
-    timeScope: TimeScope = Field(
+    timeGrouping: TimeGrouping = Field(
         ..., description="Approximate time scope in order to determine granularity level."
     )
+    timeFilter: TimeFilter
 
 
 class PlotOption(BaseModel):
@@ -210,8 +233,9 @@ class State(TypedDict):
     answer_detail: AnswerDetail
     last_query: str
     adjust_query: bool
-    aggregation_feature: Optional[List[AggregationFeature]]
-    time_scope: TimeScope
+    aggregation_feature: Optional[AggregationFeature]
+    time_grouping: TimeGrouping
+    time_filter: TimeFilter
     wants_plot: WantsPlot
     plot_code: str | None
     plot_path: str | None
