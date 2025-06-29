@@ -64,12 +64,6 @@ module.exports = {
     target: ['nsis'],
     verifyUpdateCodeSignature: false,
     artifactName: '${productName}-${version}-Windows.${ext}',
-    azureSignOptions: {
-      publisherName: `${process.env.AZURE_PUBLISHER_NAME}`,
-      endpoint: `${process.env.AZURE_ENDPOINT}`,
-      codeSigningAccountName: `${process.env.AZURE_CODE_SIGNING_NAME}`,
-      certificateProfileName: `${process.env.AZURE_CERT_PROFILE_NAME}`
-    }
   },
   nsis: {
     oneClick: true,
