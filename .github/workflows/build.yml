@@ -54,6 +54,34 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      # 4️⃣ Sign backend executable on Windows
+      - name: Sign backend executable (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          AzureSignTool sign \
+            --azure-key-vault-url "${{ secrets.AZURE_ENDPOINT }}" \
+            --azure-key-vault-client-id "${{ secrets.AZURE_CLIENT_ID }}" \
+            --azure-key-vault-tenant-id "${{ secrets.AZURE_TENANT_ID }}" \
+            --azure-key-vault-client-secret "${{ secrets.AZURE_CLIENT_SECRET }}" \
+            --azure-key-vault-certificate "${{ secrets.AZURE_CERT_PROFILE_NAME }}" \
+            --file "dist/pq-backend.exe" \
+            --description "PersonalQuery Backend" \
+            --description-url "https://github.com/HASEL-UZH/PersonalQuery"
+
+      # 5️⃣ Sign backend executable on macOS
+      - name: Sign backend executable (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          codesign --deep --force --options runtime --timestamp \
+            --sign "${{ secrets.APPLE_IDENTITY }}" \
+            dist/pq-backend
+
+      # 6️⃣ Verify macOS signature
+      - name: Verify macOS signature
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/pq-backend
+
       - name: Prevent interactive prompts
         run: git config --global core.autocrlf input
 

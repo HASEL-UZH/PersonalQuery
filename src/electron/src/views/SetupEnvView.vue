@@ -39,7 +39,6 @@ async function pasteFromClipboard() {
       <input
         v-model="apiKey"
         class="input input-bordered w-full rounded-r-none focus:outline-none focus:ring-0"
-        type="password"
         placeholder="Enter your API Key..."
       />
       <button

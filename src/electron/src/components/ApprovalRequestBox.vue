@@ -13,7 +13,6 @@ const props = defineProps<{
   data: DataRow[];
 }>();
 
-
 const globalSearch = ref('');
 const searchTerms = ref('');
 
