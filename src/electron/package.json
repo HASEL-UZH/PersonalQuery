@@ -5,7 +5,7 @@
   "main": "dist-electron/main/index.js",
   "type": "module",
   "author": {
-    "name": "Kavishan Srirangarasa",
+    "name": "HASEL",
     "email": "kavishan.srirangarasa@uzh.ch"
   },
   "scripts": {

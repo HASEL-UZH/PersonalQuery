@@ -2,7 +2,7 @@
 name = "personalquery-backend"
 version = "0.1.0"
 description = "LLM-powered backend for the PersonalQuery Electron app"
-authors = ["Kavishan Srirangarasa <kavishanwin8@hotmail.com>"]
+authors = ["HASEL <kavishan.srirangarasa@uzh.ch>"]
 readme = "README.md"
 package-mode = false
 

@@ -13,7 +13,8 @@ def load_env():
         "MY_OPENAI_API_KEY",
         "LANGSMITH_API_KEY",
         "LANGSMITH_ENDPOINT",
-        "LANGSMITH_PROJECT"
+        "LANGSMITH_PROJECT",
+        "LANGSMITH_TRACING"
     ]
 
     missing = [var for var in required_vars if not os.environ.get(var)]

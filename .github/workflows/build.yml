@@ -63,6 +63,15 @@ jobs:
         env:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
 
+      - name: Create .env file
+        working-directory: src/py-backend
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.HASEL_API_KEY }}" >> .env
+          echo "MY_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "LANGSMITH_API_KEY=${{ secrets.LANGSMITH_API_KEY }}" >> .env
+          echo "LANGSMITH_ENDPOINT=https://api.smith.langchain.com" >> .env
+          echo "LANGSMITH_PROJECT=personalQuery" >> .env
+
       - name: Install TrustedSigning PowerShell module
         if: matrix.os == 'windows-latest'
         shell: pwsh
