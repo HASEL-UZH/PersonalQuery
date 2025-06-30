@@ -1,7 +1,7 @@
 {
   "name": "personal-query",
   "description": "PersonalQuery, an extension of the PersonalAnalytics tool that integrates an LLM to enable NL querying of personal activity data.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "main": "dist-electron/main/index.js",
   "type": "module",
   "author": {

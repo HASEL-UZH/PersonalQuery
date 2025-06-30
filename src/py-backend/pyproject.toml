@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personalquery-backend"
-version = "0.1.1"
+version = "0.1.2"
 description = "LLM-powered backend for the PersonalQuery Electron app"
 authors = ["HASEL <kavishan.srirangarasa@uzh.ch>"]
 readme = "README.md"
