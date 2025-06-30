@@ -78,14 +78,14 @@ jobs:
       - name: Sign backend executable (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          AzureSignTool sign \
-            --azure-key-vault-url "${AZURE_ENDPOINT}" \
-            --azure-key-vault-client-id "${AZURE_CLIENT_ID}" \
-            --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" \
-            --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" \
-            --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" \
-            --file "dist/pq-backend.exe" \
-            --description "PersonalQuery Backend" \
+          AzureSignTool sign `
+            --azure-key-vault-url "${AZURE_ENDPOINT}" `
+            --azure-key-vault-client-id "${AZURE_CLIENT_ID}" `
+            --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" `
+            --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" `
+            --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" `
+            --file "dist/pq-backend.exe" `
+            --description "PersonalQuery Backend" `
             --description-url "https://github.com/HASEL-UZH/PersonalQuery"
         env:
           AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
