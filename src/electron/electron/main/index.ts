@@ -124,14 +124,6 @@ app.whenReady().then(async () => {
     }
     backendProcess = startBackend();
 
-    ipcMain.on('restart-backend', () => {
-      LOG.info('Restarting backend process...');
-      if (backendProcess) {
-        backendProcess.kill();
-      }
-      backendProcess = startBackend();
-    });
-
     app.setLoginItemSettings({
       openAtLogin: true,
       args: ['--hidden'] // Using this flag to detect auto-launch
@@ -141,7 +133,6 @@ app.whenReady().then(async () => {
   }
 
   try {
-    await waitForBackendReady();
     await databaseService.checkAndImportOldDataBase();
     await databaseService.init();
     await workScheduleService.init();
