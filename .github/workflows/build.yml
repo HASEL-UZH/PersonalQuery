@@ -45,6 +45,13 @@ jobs:
       # Backend build (runs BEFORE Electron packaging)
       # ------------------------------------------------
 
+      - name: Debug CSC_LINK length
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          echo "CSC_LINK length: ${#CSC_LINK}"
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+
       - name: Install backend dependencies
         working-directory: src/py-backend
         run: poetry install --no-root
