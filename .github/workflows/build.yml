@@ -22,6 +22,7 @@ jobs:
             mac_arch: arm64
           - os: macos-latest
             mac_arch: x64
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,11 +41,15 @@ jobs:
       - name: Install Poetry
         run: pip install poetry
 
-      - name: Install backend dependencies via Poetry
+      # ------------------------------------------------
+      # Backend build (runs BEFORE Electron packaging)
+      # ------------------------------------------------
+
+      - name: Install backend dependencies
         working-directory: ../py-backend
         run: poetry install --no-root
 
-      - name: Build backend executable with PyInstaller
+      - name: Build backend executable
         working-directory: ../py-backend
         run: poetry run pyinstaller personalquery-backend.spec
         env:
@@ -54,7 +59,7 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      # macOS only: Import code signing certificate for codesign
+      # macOS: Import signing certificate
       - name: Import macOS code signing certificate
         if: startsWith(matrix.os, 'macos')
         run: |
@@ -82,35 +87,32 @@ jobs:
       # macOS: Sign backend executable
       - name: Sign backend executable (macOS)
         if: startsWith(matrix.os, 'macos')
+        working-directory: ../py-backend
         run: |
+          # Capture the first Developer ID Application identity
+          SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
+          echo "Using signing identity: $SIGN_ID"
+
           codesign --deep --force --options runtime --timestamp \
-            --sign "Developer ID Application: Your Name (TEAMID)" \
+            --sign "$SIGN_ID" \
             dist/pq-backend
+      
 
       # macOS: Verify signature
       - name: Verify macOS signature
         if: startsWith(matrix.os, 'macos')
+        working-directory: ../py-backend
         run: |
           codesign --verify --deep --strict --verbose=2 dist/pq-backend
 
-      - name: Prevent interactive prompts
-        run: git config --global core.autocrlf input
+      # ------------------------------------------------
+      # Electron build (as in original workflow)
+      # ------------------------------------------------
 
-      - name: Install dependencies (non-interactive)
-        run: npm ci --no-audit --no-fund
-        env:
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+      - name: Install Electron dependencies
+        run: npm ci
 
-      - name: Install TrustedSigning PowerShell module
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
-          Install-Module -Name TrustedSigning -Force -Scope CurrentUser
-          Import-Module TrustedSigning
-          Get-Command Invoke-TrustedSigning
-
-      - name: Build
+      - name: Build Electron App
         shell: bash
         run: |
           if [ "${{ matrix.os }}" == "macos-latest" ]; then
