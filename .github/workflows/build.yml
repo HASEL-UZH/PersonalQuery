@@ -41,11 +41,11 @@ jobs:
         run: pip install poetry
 
       - name: Install backend dependencies via Poetry
-        working-directory: src/py-backend
+        working-directory: ../py-backend
         run: poetry install --no-root
 
       - name: Build backend executable with PyInstaller
-        working-directory: src/py-backend
+        working-directory: ../py-backend
         run: poetry run pyinstaller personalquery-backend.spec
         env:
           LANGSMITH_TRACING: false
@@ -54,7 +54,18 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      # 4️⃣ Sign backend executable on Windows
+      # macOS only: Import code signing certificate for codesign
+      - name: Import macOS code signing certificate
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          echo "${{ secrets.CSC_LINK }}" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "${{ secrets.CSC_KEY_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      # Windows: Sign backend executable
       - name: Sign backend executable (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -68,15 +79,15 @@ jobs:
             --description "PersonalQuery Backend" \
             --description-url "https://github.com/HASEL-UZH/PersonalQuery"
 
-      # 5️⃣ Sign backend executable on macOS
+      # macOS: Sign backend executable
       - name: Sign backend executable (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
           codesign --deep --force --options runtime --timestamp \
-            --sign "${{ secrets.APPLE_IDENTITY }}" \
+            --sign "Developer ID Application: Your Name (TEAMID)" \
             dist/pq-backend
 
-      # 6️⃣ Verify macOS signature
+      # macOS: Verify signature
       - name: Verify macOS signature
         if: startsWith(matrix.os, 'macos')
         run: |
