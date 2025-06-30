@@ -41,5 +41,6 @@ type Commands = {
   triggerPermissionCheckAccessibility: (prompt: boolean) => boolean;
   triggerPermissionCheckScreenRecording: () => boolean;
   getDataCoverageScore: () => Promise<CoverageScore[]>;
+  saveEnvFile: (content: string) => Promise<void>;
 };
 export default Commands;

@@ -32,6 +32,7 @@ export class WindowService {
   private dataExportWindow: BrowserWindow;
   private settingsWindow: BrowserWindow;
   private chatWindow: BrowserWindow;
+  private envSetupWindow: BrowserWindow;
 
   private hasOpenedDataExportUrl: boolean = false;
   private hasRevealedDataEportFolder: boolean = false;
@@ -224,7 +225,6 @@ export class WindowService {
     this.chatWindow.on('close', () => {
       this.chatWindow = null;
     });
-    this.chatWindow.webContents.openDevTools();
     this.chatWindow.show();
   }
 
@@ -377,6 +377,38 @@ export class WindowService {
       // reset flags for next time
       this.hasOpenedDataExportUrl = false;
       this.hasRevealedDataEportFolder = false;
+    });
+  }
+
+  public async createEnvSetupWindow(): Promise<void> {
+    return new Promise(async (resolve) => {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const preload = join(__dirname, '../preload/index.mjs');
+
+      this.envSetupWindow = new BrowserWindow({
+        width: 500,
+        height: 300,
+        resizable: false,
+        title: 'Set up OpenAI API Key',
+        webPreferences: {
+          preload
+        }
+      });
+
+      this.envSetupWindow.on('closed', () => {
+        resolve();
+      });
+
+      if (process.env.VITE_DEV_SERVER_URL) {
+        await this.envSetupWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/setup-env`);
+      } else {
+        await this.envSetupWindow.loadFile(path.join(process.env.DIST, 'index.html'), {
+          hash: 'setup-env'
+        });
+      }
+
+      this.envSetupWindow.show();
     });
   }
 

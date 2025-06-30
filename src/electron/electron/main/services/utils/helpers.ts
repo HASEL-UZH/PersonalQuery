@@ -1,4 +1,4 @@
-import electron from 'electron';
+import electron, { dialog } from 'electron';
 
 export declare interface Is {
   dev: boolean;
@@ -39,6 +39,5 @@ export async function waitForBackendReady(timeout = 60000, interval = 250): Prom
     }
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
-
   throw new Error(`Backend did not become ready within ${timeout} ms`);
 }

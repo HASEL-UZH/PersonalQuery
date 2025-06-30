@@ -26,6 +26,7 @@ import path from 'path';
 import { SessionService } from '../main/services/SessionService';
 import { UsageDataEventType } from '../enums/UsageDataEventType.enum';
 import { DatabaseService } from '../main/services/DatabaseService';
+import fs from 'node:fs';
 
 const LOG = getMainLogger('IpcHandler');
 
@@ -87,7 +88,8 @@ export class IpcHandler {
       startAllTrackers: this.startAllTrackers,
       triggerPermissionCheckAccessibility: this.triggerPermissionCheckAccessibility,
       triggerPermissionCheckScreenRecording: this.triggerPermissionCheckScreenRecording,
-      getDataCoverageScore: this.getDataCoverageScore
+      getDataCoverageScore: this.getDataCoverageScore,
+      saveEnvFile: this.saveEnvFile
     };
 
     Object.keys(this.actions).forEach((action: string): void => {
@@ -266,5 +268,11 @@ export class IpcHandler {
 
   private async getDataCoverageScore(): Promise<{ day: string; score: number }[]> {
     return await this.databaseService.getDataCoverageScore();
+  }
+
+  private async saveEnvFile(content: string): Promise<void> {
+    const envPath = path.join(process.resourcesPath, '.env');
+    fs.writeFileSync(envPath, content, 'utf-8');
+    LOG.info(`Saved .env file to ${envPath}`);
   }
 }

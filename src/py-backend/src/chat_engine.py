@@ -49,34 +49,26 @@ async def initialize():
         model="gpt-4o",
         temperature=0.0,
         base_url="https://api.openai.com/v1",
-        api_key=os.getenv("MY_OPENAI_API_KEY")
+        api_key=os.getenv("OPENAI_API_KEY")
     )
 
     llm_openai_high_temp = ChatOpenAI(
         model="gpt-4o",
         temperature=1.0,
         base_url="https://api.openai.com/v1",
-        api_key=os.getenv("MY_OPENAI_API_KEY")
+        api_key=os.getenv("OPENAI_API_KEY")
     )
 
     llm_openai_mini = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.0,
         base_url="https://api.openai.com/v1",
-        api_key=os.getenv("MY_OPENAI_API_KEY")
-    )
-
-    llm_llama31 = ChatOpenAI(
-        model="llama31instruct",
-        temperature=0.0,
-        base_url="http://llm.hasel.dev:20769/v1",
         api_key=os.getenv("OPENAI_API_KEY")
     )
 
     LLMRegistry.register("openai", llm_openai)
     LLMRegistry.register("openai-high-temp", llm_openai_high_temp)
     LLMRegistry.register("openai-mini", llm_openai_mini)
-    LLMRegistry.register("llama31", llm_llama31)
 
     async with aiosqlite.connect(str(CHECKPOINT_DB_PATH)) as setup_conn:
         await setup_conn.execute("""

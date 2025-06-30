@@ -54,7 +54,12 @@ const router: Router = createRouter({
         }
       ]
     },
-    { path: '/', redirect: '/chat/default' }
+    { path: '/', redirect: '/chat/default' },
+    {
+      path: '/setup-env',
+      name: 'SetupEnv',
+      component: () => import('../views/SetupEnvView.vue')
+    }
   ]
 });
 

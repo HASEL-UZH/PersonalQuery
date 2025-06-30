@@ -12,7 +12,6 @@ import SQLReviewBox from '../components/SQLReviewBox.vue';
 import typedIpcRenderer from '../utils/typedIpcRenderer';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
-import DailyGoal from '../components/DailyGoal.vue';
 
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);

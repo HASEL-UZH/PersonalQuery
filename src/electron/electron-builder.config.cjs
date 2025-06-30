@@ -25,8 +25,11 @@ module.exports = {
   extraResources: [
     {
       from: `../py-backend/dist/${backendFile}`,
-      to: backendFile,
-      filter: ['**/*']
+      to: backendFile
+    },
+    {
+      from: `../py-backend/dist/.env`,
+      to: '.env'
     }
   ],
   publish: {

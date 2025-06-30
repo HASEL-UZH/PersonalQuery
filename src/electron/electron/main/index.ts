@@ -14,6 +14,7 @@ import { TrackerService } from './services/trackers/TrackerService';
 import AppUpdaterService from './services/AppUpdaterService';
 import { WindowService } from './services/WindowService';
 import { IpcHandler } from '../ipc/IpcHandler';
+import { ipcMain } from 'electron';
 import { ExperienceSamplingService } from './services/ExperienceSamplingService';
 import studyConfig from '../../shared/study.config';
 import { is, waitForBackendReady } from './services/utils/helpers';
@@ -25,6 +26,7 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SessionService } from './services/SessionService';
+import treeKill from 'tree-kill';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +62,32 @@ const ipcHandler: IpcHandler = new IpcHandler(
 const isDev = process.env.NODE_ENV === 'development';
 let backendProcess: ReturnType<typeof spawn> | null = null;
 
+function startBackend() {
+  const backendExePath = path.join(process.resourcesPath, backendBinary);
+  LOG.info(`Launching backend at: ${backendExePath}`);
+  const newBackend = spawn(backendExePath, {
+    cwd: path.dirname(backendExePath)
+  });
+  newBackend.stdout.on('data', (data) => {
+    LOG.info(`[Backend STDOUT] ${data.toString().trim()}`);
+  });
+  newBackend.stderr.on('data', (data) => {
+    LOG.error(`[Backend STDERR] ${data.toString().trim()}`);
+  });
+  newBackend.on('error', (err) => {
+    LOG.error(`[Backend ERROR] ${err}`);
+  });
+  return newBackend;
+}
+
+globalThis.backendProcess = backendProcess;
+
+/* eslint-disable no-var */
+declare global {
+  var backendProcess: ReturnType<typeof spawn> | null;
+}
+/* eslint-enable no-var */
+
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) {
   app.disableHardwareAcceleration();
@@ -85,46 +113,25 @@ log.initialize();
 const LOG = getMainLogger('Main');
 
 app.whenReady().then(async () => {
+  await ipcHandler.init();
   app.setAppUserModelId('ch.ifi.hasel.personalquery');
-  const isDev = !app.isPackaged;
-
-  if (!isDev) {
-    try {
-      const backendExePath = path.join(process.resourcesPath, backendBinary);
-      LOG.info('[DEBUG] isDev = false');
-      LOG.info('[DEBUG] Resolved backend exe path:', backendExePath);
-
-      const exists = fs.existsSync(backendExePath);
-      LOG.info('[DEBUG] File exists:', exists);
-
-      if (!exists) {
-        throw new Error(`[${backendBinary}] NOT FOUND at: ${backendExePath}`);
-      }
-      LOG.info(`Launching backend with PID placeholder`);
-
-      backendProcess = spawn(backendExePath, {
-        cwd: path.dirname(backendExePath)
-      });
-      LOG.info(`Spawned backendProcess with PID: ${backendProcess.pid}`);
-      backendProcess.stdout.on('data', (data) => {
-        LOG.info(`[Backend STDOUT] ${data}`);
-      });
-
-      backendProcess.stderr.on('data', (data) => {
-        LOG.error(`[Backend STDERR] ${data}`);
-      });
-
-      backendProcess.on('error', (err) => {
-        LOG.error(`[Backend ERROR EVENT] ${err}`);
-      });
-
-      LOG.info('Attempted to launch backend.');
-    } catch (err) {
-      LOG.error('Failed to launch backend:', err);
-    }
-  }
-
   if (!is.dev) {
+    const envPath = path.join(process.resourcesPath, '.env');
+    if (!fs.existsSync(envPath)) {
+      LOG.info('.env file not found, prompting user to create one.');
+      await windowService.createEnvSetupWindow();
+      LOG.info('.env setup window completed.');
+    }
+    backendProcess = startBackend();
+
+    ipcMain.on('restart-backend', () => {
+      LOG.info('Restarting backend process...');
+      if (backendProcess) {
+        backendProcess.kill();
+      }
+      backendProcess = startBackend();
+    });
+
     app.setLoginItemSettings({
       openAtLogin: true,
       args: ['--hidden'] // Using this flag to detect auto-launch
@@ -140,7 +147,6 @@ app.whenReady().then(async () => {
     await workScheduleService.init();
     await settingsService.init();
     await windowService.init();
-    await ipcHandler.init();
 
     const currentTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const currentLocale = app.getLocale();

@@ -52,8 +52,7 @@ jobs:
           LANGSMITH_ENDPOINT: https://api.smith.langchain.com
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: personalQuery
-          OPENAI_API_KEY: ${{ secrets.HASEL_API_KEY }}
-          MY_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Prevent interactive prompts
         run: git config --global core.autocrlf input
@@ -62,15 +61,6 @@ jobs:
         run: npm ci --no-audit --no-fund
         env:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-
-      - name: Create .env file
-        working-directory: src/py-backend
-        run: |
-          echo "OPENAI_API_KEY=${{ secrets.HASEL_API_KEY }}" >> .env
-          echo "MY_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-          echo "LANGSMITH_API_KEY=${{ secrets.LANGSMITH_API_KEY }}" >> .env
-          echo "LANGSMITH_ENDPOINT=https://api.smith.langchain.com" >> .env
-          echo "LANGSMITH_PROJECT=personalQuery" >> .env
 
       - name: Install TrustedSigning PowerShell module
         if: matrix.os == 'windows-latest'

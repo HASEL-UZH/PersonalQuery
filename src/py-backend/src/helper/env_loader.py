@@ -1,22 +1,19 @@
+import json
 import os
 import sys
 from dotenv import load_dotenv
 
 
 def load_env():
-    dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    dotenv_path = os.path.join(base_path, '.env')
+
     if os.path.exists(dotenv_path):
         load_dotenv(dotenv_path)
+    else:
+        print("WARNING: .env file not found at runtime")
 
-    required_vars = [
-        "OPENAI_API_KEY",
-        "MY_OPENAI_API_KEY",
-        "LANGSMITH_API_KEY",
-        "LANGSMITH_ENDPOINT",
-        "LANGSMITH_PROJECT",
-        "LANGSMITH_TRACING"
-    ]
-
-    missing = [var for var in required_vars if not os.environ.get(var)]
-    if missing:
-        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")

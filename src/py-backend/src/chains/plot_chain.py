@@ -4,7 +4,6 @@ import platform
 from langchain import hub
 
 from helper.env_loader import load_env
-from helper.plot_style_patch import patched_draw_nodes, patched_draw_labels, patched_draw_edges
 from llm_registry import LLMRegistry
 from schemas import State, PythonOutput, PlotOption
 
@@ -15,10 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import matplotlib.font_manager as fm
-import networkx as nx
 import plotly.express as px
-import plotly.io as pio
-from qbstyles import mpl_style
 import plotly.graph_objects as go
 
 
@@ -118,7 +114,12 @@ def run_plot_script(state: State) -> State:
 
         plt.rcParams['font.family'] = ['DejaVu Sans', emoji_font]
 
-        mpl_style(dark=True)
+        try:
+            from qbstyles import mpl_style
+            mpl_style(dark=True)
+        except Exception as e:
+            print("WARNING: Could not apply qbstyles:", e)
+
 
     except Exception as e:
         state["plot_error"] = f"Font setup failed: {e}"

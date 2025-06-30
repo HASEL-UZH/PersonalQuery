@@ -43,7 +43,6 @@ def answer_chain(llm: ChatOpenAI, state: State):
 async def generate_answer(state: State, config: dict) -> State:
     """For LangGraph Orchestration"""
     llm = LLMRegistry.get("openai")
-    llm2 = LLMRegistry.get("llama31")
     messages = state["messages"]
     insight_mode = state["insight_mode"]
     ws = config.get("configurable", {}).get("websocket")
@@ -91,13 +90,11 @@ async def generate_answer(state: State, config: dict) -> State:
     if state['branch'] == "follow_up":
         temp_messages = replace_or_insert_system_prompt(messages, prompt)
         stream = llm.astream(temp_messages)
-        stream2 = llm2.astream(temp_messages)
     else:
         stream = llm.astream(prompt.to_string())
         messages2 = [
             {"role": "system", "content": prompt.messages[0].content}
         ]
-        stream2 = llm2.astream(messages2)
 
     final_msg = AIMessage(content="")
 
@@ -107,14 +104,7 @@ async def generate_answer(state: State, config: dict) -> State:
             if ws:
                 await ws.send_json({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg.content),
                                     "id": final_msg.id})
-    """""
-    final_msg2 = AIMessage(content="")
-    async for chunk in stream2:
-        if isinstance(chunk, AIMessageChunk):
-            final_msg2 = chunk if final_msg2.content == "" else final_msg2 + chunk
-            if on_update:
-                await on_update({"type": "chunk", "content": convert_bracket_to_dollar_latex(final_msg2.content), "id": final_msg2.id})
-"""
+
     formatted_response = convert_bracket_to_dollar_latex(final_msg.content)
     state["answer"] = formatted_response
 
