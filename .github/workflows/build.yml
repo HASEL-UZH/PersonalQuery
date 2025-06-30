@@ -46,11 +46,11 @@ jobs:
       # ------------------------------------------------
 
       - name: Install backend dependencies
-        working-directory: ../py-backend
+        working-directory: src/py-backend
         run: poetry install --no-root
 
       - name: Build backend executable
-        working-directory: ../py-backend
+        working-directory: src/py-backend
         run: poetry run pyinstaller personalquery-backend.spec
         env:
           LANGSMITH_TRACING: false
@@ -87,7 +87,7 @@ jobs:
       # macOS: Sign backend executable
       - name: Sign backend executable (macOS)
         if: startsWith(matrix.os, 'macos')
-        working-directory: ../py-backend
+        working-directory: src/py-backend
         run: |
           # Capture the first Developer ID Application identity
           SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
@@ -101,7 +101,7 @@ jobs:
       # macOS: Verify signature
       - name: Verify macOS signature
         if: startsWith(matrix.os, 'macos')
-        working-directory: ../py-backend
+        working-directory: src/py-backend
         run: |
           codesign --verify --deep --strict --verbose=2 dist/pq-backend
 
