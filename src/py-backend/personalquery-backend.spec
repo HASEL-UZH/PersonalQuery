@@ -9,7 +9,7 @@ a = Analysis(
     ['src/main.py'],
     pathex=['src'],
     binaries=[],
-    datas=[('src/*.py', '.')],
+    datas=[('src/*.py', '.'), ('src/.env', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
