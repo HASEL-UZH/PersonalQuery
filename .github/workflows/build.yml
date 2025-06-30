@@ -49,13 +49,13 @@ jobs:
         working-directory: src/py-backend
         run: poetry install --no-root
 
-      - name: Check CSC_LINK content type
+      - name: debug
         run: |
-          if [ -z "${CSC_LINK}" ]; then
-            echo "ERROR: CSC_LINK is empty"
+          if [ -z "${AZURE_TENANT_ID}" ]; then
+            echo "ERROR: AZURE_TENANT_ID is empty"
             exit 1
           fi
-          echo "CSC_LINK seems to be set. Length: ${#CSC_LINK}"
+          echo "AZURE_TENANT_ID seems to be set. Length: ${#AZURE_TENANT_ID}"
       
       
 
