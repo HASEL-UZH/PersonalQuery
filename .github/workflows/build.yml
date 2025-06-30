@@ -45,13 +45,6 @@ jobs:
       # Backend build (runs BEFORE Electron packaging)
       # ------------------------------------------------
 
-      - name: Debug CSC_LINK length
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          echo "CSC_LINK length: ${#CSC_LINK}"
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-
       - name: Install backend dependencies
         working-directory: src/py-backend
         run: poetry install --no-root
@@ -80,7 +73,7 @@ jobs:
       - name: Import macOS code signing certificate
         if: startsWith(matrix.os, 'macos')
         run: |
-          echo "${CSC_LINK}" | base64 --decode > certificate.p12
+          echo "${CSC_LINK}" > certificate.p12
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
