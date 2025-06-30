@@ -49,16 +49,6 @@ jobs:
         working-directory: src/py-backend
         run: poetry install --no-root
 
-      - name: Debug AZURE_TENANT_ID
-        run: |
-          if [ -z "${AZURE_TENANT_ID}" ]; then
-            echo "ERROR: AZURE_TENANT_ID is empty"
-            exit 1
-          fi
-          echo "AZURE_TENANT_ID seems to be set. Length: ${#AZURE_TENANT_ID}"
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
       - name: Build backend executable
         working-directory: src/py-backend
         run: poetry run pyinstaller personalquery-backend.spec
