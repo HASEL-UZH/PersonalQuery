@@ -49,6 +49,16 @@ jobs:
         working-directory: src/py-backend
         run: poetry install --no-root
 
+      - name: Check CSC_LINK content type
+        run: |
+          if [ -z "${CSC_LINK}" ]; then
+            echo "ERROR: CSC_LINK is empty"
+            exit 1
+          fi
+          echo "CSC_LINK seems to be set. Length: ${#CSC_LINK}"
+      
+      
+
       - name: Build backend executable
         working-directory: src/py-backend
         run: poetry run pyinstaller personalquery-backend.spec
