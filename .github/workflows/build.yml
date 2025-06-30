@@ -73,6 +73,15 @@ jobs:
       #          CSC_LINK: ${{ secrets.CSC_LINK }}
       #          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
+      - name: Install AzureSignTool
+        if: matrix.os == 'windows-latest'
+        run: dotnet tool install --global AzureSignTool
+
+      - name: Add .NET tools to PATH
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
 
       # Windows: Sign backend executable
       - name: Sign backend executable (Windows)
