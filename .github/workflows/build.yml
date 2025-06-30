@@ -93,7 +93,7 @@ jobs:
             --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" `
             --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" `
             --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" `
-            --file "../py-backend/dist/pq-backend.exe" `
+            --file "${GITHUB_WORKSPACE}\\src\\py-backend\\dist\\pq-backend.exe" `
             --description "PersonalQuery Backend" `
             --description-url "https://github.com/HASEL-UZH/PersonalQuery"
         env:
