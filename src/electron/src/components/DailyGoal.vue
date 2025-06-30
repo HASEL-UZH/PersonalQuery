@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 
 const expanded = ref(true);
 
@@ -29,6 +29,12 @@ function getTodayDate() {
 }
 
 onMounted(() => {
+  // Load expanded state
+  const storedExpanded = localStorage.getItem('dailyGoalExpanded');
+  if (storedExpanded !== null) {
+    expanded.value = storedExpanded === 'true';
+  }
+
   const today = getTodayDate();
   const stored = JSON.parse(localStorage.getItem('dailyGoal') || '{}');
   let usedIndices = stored.usedIndices || [];
@@ -57,6 +63,11 @@ onMounted(() => {
 
     selectedGoal.value = goals[randomIndex];
   }
+});
+
+// Watch and persist expanded state
+watch(expanded, (newValue) => {
+  localStorage.setItem('dailyGoalExpanded', String(newValue));
 });
 </script>
 

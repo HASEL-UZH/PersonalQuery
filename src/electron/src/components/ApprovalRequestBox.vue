@@ -13,6 +13,33 @@ const props = defineProps({
 });
 
 const globalSearch = ref('');
+const searchTerms = ref('');
+
+function handleObfuscate() {
+  const terms = searchTerms.value
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (!terms.length) return;
+
+  props.data.forEach((row) => {
+    for (const key in row) {
+      const cell = row[key];
+      if (typeof cell === 'string') {
+        let obfuscated = cell;
+        terms.forEach((term) => {
+          const mask = '*'.repeat(term.length);
+          obfuscated = obfuscated.split(term).join(mask);
+        });
+        row[key] = obfuscated;
+      }
+    }
+  });
+
+  // Clear input
+  searchTerms.value = '';
+}
 
 watch(globalSearch, (newVal) => {
   filters.value.global.value = newVal;
@@ -76,6 +103,16 @@ function tableBodyCell({ state }: { state: Record<string, any> }) {
                 placeholder="Search for values..."
                 class="input input-sm input-bordered w-full max-w-xs"
               />
+            </span>
+
+            <span class="flex gap-2">
+              <input
+                v-model="searchTerms"
+                type="text"
+                placeholder="Terms to obfuscate (comma-separated)"
+                class="input input-sm input-bordered w-64"
+              />
+              <button @click="handleObfuscate" class="btn btn-secondary btn-sm">Obfuscate</button>
             </span>
           </div>
         </template>

@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
 from langchain import hub
 from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
@@ -172,12 +174,23 @@ def write_query(state: State) -> State:
 
 
 def execute_query(state: State) -> State:
-    db = get_db()
-    raw_result = db._execute(state["query"])
-    state["raw_result"] = raw_result
+    def run_query():
+        db = get_db()
+        raw_result = db._execute(state["query"])
+        return raw_result
 
-    chunks = split_result(raw_result)
-    state["result"] = [format_result_as_markdown(chunk) for chunk in chunks]
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_query)
+        try:
+            # Wait up to 180 seconds
+            raw_result = future.result(timeout=180)
+            chunks = split_result(raw_result)
+            state["raw_result"] = raw_result
+            state["result"] = [format_result_as_markdown(chunk) for chunk in chunks]
+        except FuturesTimeoutError:
+            state["result"] = ["Query execution exceeded 3 minutes and was aborted."]
+        except Exception as e:
+            state["result"] = [f"Query execution failed: {str(e)}"]
     return state
 
 
@@ -191,9 +204,17 @@ def correct_query(query, instructions):
 
 
 def execute_corrected_query(query):
-    db = get_db()
-    try:
-        result = db._execute(query)
-        return result
-    except Exception as e:
-        return {"error": str(e)}
+    def run_query():
+        db = get_db()
+        return db._execute(query)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_query)
+        try:
+            # Wait up to 3 minutes (180 seconds)
+            result = future.result(timeout=180)
+            return result
+        except FuturesTimeoutError:
+            return {"error": "Query execution exceeded 3 minutes and was aborted."}
+        except Exception as e:
+            return {"error": f"Query execution failed: {str(e)}"}

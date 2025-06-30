@@ -98,7 +98,7 @@ const currentMeta = ref<Meta>({
 });
 const bottomAnchor = ref<HTMLElement | null>(null);
 const autoApprove = ref(false);
-const autoSQL = ref(false);
+const autoSQL = ref(true);
 const answerDetail = ref('auto');
 const wantsPlot = ref('auto');
 const topK = ref(150);
