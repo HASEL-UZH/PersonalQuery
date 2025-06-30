@@ -215,6 +215,7 @@ class State(TypedDict):
     thread_id: str
     messages: List[BaseMessage]
     question: str
+    original_question: str
     title_exist: bool
     branch: str
     insight_mode: str

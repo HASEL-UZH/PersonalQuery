@@ -92,6 +92,7 @@ async def initialize():
                     id TEXT PRIMARY KEY,
                     thread_id TEXT,
                     message_id TEXT,
+                    question TEXT,
                     message_content TEXT,
                     data_correct INTEGER,
                     question_answered INTEGER,
@@ -244,34 +245,35 @@ async def run_chat(question: str,
                 f"\n\nCurrent time: {current_time}"
             )
         ))
+        state: State = {
+            "thread_id": chat_id,
+            "messages": messages,
+            "question": question,
+            "title_exist": await title_exists(chat_id),
+            "branch": "",
+            "current_time": current_time,
+            "tables": [],
+            "activities": [],
+            "query": "",
+            "original_question": "",
+            "raw_result": "",
+            "result": [],
+            "answer": "",
+            "top_k": top_k,
+            "last_query": await get_last_query(chat_id),
+            "adjust_query": False,
+            "wants_plot": wants_plot,
+            "answer_detail": answer_detail,
+            "auto_sql": auto_sql,
+            "auto_approve": auto_approve,
+            "plot_code": None,
+            "plot_path": None,
+            "plot_base64": None,
+            "plot_attempts": 0
+        }
 
     messages.append(HumanMessage(content=question))
 
-    state: State = {
-        "thread_id": chat_id,
-        "messages": messages,
-        "question": question,
-        "title_exist": await title_exists(chat_id),
-        "branch": "",
-        "current_time": current_time,
-        "tables": [],
-        "activities": [],
-        "query": "",
-        "raw_result": "",
-        "result": [],
-        "answer": "",
-        "top_k": top_k,
-        "last_query": await get_last_query(chat_id),
-        "adjust_query": False,
-        "wants_plot": wants_plot,
-        "answer_detail": answer_detail,
-        "auto_sql": auto_sql,
-        "auto_approve": auto_approve,
-        "plot_code": None,
-        "plot_path": None,
-        "plot_base64": None,
-        "plot_attempts": 0
-    }
 
     if not auto_approve or not auto_sql:
         interrupt_nodes = ["execute_query"]
@@ -444,10 +446,12 @@ async def rename_chat(chat_id: str, new_title: str):
 
 
 async def store_feedback(chat_id, msg_id, data_correct, question_answered, comment):
-    config: RunnableConfig = {"configurable": {"thread_id": chat_id}}
+    config: RunnableConfig = {"configurable": {"thread_id": chat_id}, "run_id": msg_id}
     try:
         snapshot = await graph.aget_state(config)
         messages = snapshot.values.get("messages", [])
+        question = snapshot.values.get("original_question", "")
+        print(question)
     except Exception:
         return {"error": "Chat not found"}
 
@@ -474,14 +478,15 @@ async def store_feedback(chat_id, msg_id, data_correct, question_answered, comme
 
     cursor.execute("""
             INSERT INTO feedback (
-                id, thread_id, message_id, message_content,
+                id, thread_id, message_id, question, message_content,
                 data_correct, question_answered, comment, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
         feedback_id,
         chat_id,
         msg_id,
+        question,
         content,
         data_correct,
         question_answered,
