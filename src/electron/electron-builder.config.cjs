@@ -63,7 +63,7 @@ module.exports = {
   win: {
     target: ['nsis'],
     verifyUpdateCodeSignature: false,
-    artifactName: '${productName}-${version}-Windows.${ext}',
+    artifactName: '${productName}-${version}-Windows.${ext}'
   },
   nsis: {
     oneClick: true,

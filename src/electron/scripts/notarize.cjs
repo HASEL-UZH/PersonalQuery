@@ -32,10 +32,7 @@ exports.default = async function afterSign(context) {
   } else if (electronPlatformName === 'win32') {
     console.info('Signing Windows executable using Azure Trusted Signing.');
 
-    const exePath = path.resolve(
-      appOutDir,
-      `${packager.appInfo.productFilename}.exe`
-    );
+    const exePath = path.resolve(appOutDir, `${packager.appInfo.productFilename}.exe`);
 
     console.info(`Signing: ${exePath}`);
 
@@ -47,14 +44,22 @@ exports.default = async function afterSign(context) {
           '-NonInteractive',
           '-Command',
           'Import-Module TrustedSigning; Invoke-TrustedSigning',
-          '-Endpoint', process.env.AZURE_ENDPOINT,
-          '-CertificateProfileName', process.env.AZURE_CERT_PROFILE_NAME,
-          '-CodeSigningAccountName', process.env.AZURE_CODE_SIGNING_NAME,
-          '-PublisherName', process.env.AZURE_PUBLISHER_NAME,
-          '-TimestampRfc3161', 'http://timestamp.acs.microsoft.com',
-          '-TimestampDigest', 'SHA256',
-          '-FileDigest', 'SHA256',
-          '-Files', exePath
+          '-Endpoint',
+          process.env.AZURE_ENDPOINT,
+          '-CertificateProfileName',
+          process.env.AZURE_CERT_PROFILE_NAME,
+          '-CodeSigningAccountName',
+          process.env.AZURE_CODE_SIGNING_NAME,
+          '-PublisherName',
+          process.env.AZURE_PUBLISHER_NAME,
+          '-TimestampRfc3161',
+          'http://timestamp.acs.microsoft.com',
+          '-TimestampDigest',
+          'SHA256',
+          '-FileDigest',
+          'SHA256',
+          '-Files',
+          exePath
         ],
         { stdio: 'inherit' }
       );
