@@ -774,7 +774,7 @@ onMounted(async () => {
           />
           <ApprovalRequestBox
             v-if="needsApproval && !needsSQLReview && index === wsMessages.length - 1"
-            :data="reviewMeta?.data"
+            :data="reviewMeta?.data ?? []"
             @approve="respondToApproval"
             @cell-edit-complete="onCellEditComplete"
           />

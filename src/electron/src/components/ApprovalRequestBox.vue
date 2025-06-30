@@ -5,12 +5,14 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
 
-const props = defineProps({
-  data: {
-    type: Array,
-    default: () => []
-  }
-});
+interface DataRow {
+  [key: string]: any;
+}
+
+const props = defineProps<{
+  data: DataRow[];
+}>();
+
 
 const globalSearch = ref('');
 const searchTerms = ref('');
