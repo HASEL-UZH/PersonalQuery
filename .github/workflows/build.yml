@@ -49,7 +49,7 @@ jobs:
         working-directory: src/py-backend
         run: poetry install --no-root
 
-      - name: debug
+      - name: Debug AZURE_TENANT_ID
         run: |
           if [ -z "${AZURE_TENANT_ID}" ]; then
             echo "ERROR: AZURE_TENANT_ID is empty"
@@ -58,8 +58,6 @@ jobs:
           echo "AZURE_TENANT_ID seems to be set. Length: ${#AZURE_TENANT_ID}"
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      
-      
 
       - name: Build backend executable
         working-directory: src/py-backend
@@ -75,40 +73,50 @@ jobs:
       - name: Import macOS code signing certificate
         if: startsWith(matrix.os, 'macos')
         run: |
-          echo "${{ secrets.CSC_LINK }}" | base64 --decode > certificate.p12
+          echo "${CSC_LINK}" | base64 --decode > certificate.p12
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
-          security import certificate.p12 -k build.keychain -P "${{ secrets.CSC_KEY_PASSWORD }}" -T /usr/bin/codesign
+          security import certificate.p12 -k build.keychain -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # Windows: Sign backend executable
       - name: Sign backend executable (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           AzureSignTool sign \
-            --azure-key-vault-url "${{ secrets.AZURE_ENDPOINT }}" \
-            --azure-key-vault-client-id "${{ secrets.AZURE_CLIENT_ID }}" \
-            --azure-key-vault-tenant-id "${{ secrets.AZURE_TENANT_ID }}" \
-            --azure-key-vault-client-secret "${{ secrets.AZURE_CLIENT_SECRET }}" \
-            --azure-key-vault-certificate "${{ secrets.AZURE_CERT_PROFILE_NAME }}" \
+            --azure-key-vault-url "${AZURE_ENDPOINT}" \
+            --azure-key-vault-client-id "${AZURE_CLIENT_ID}" \
+            --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" \
+            --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" \
+            --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" \
             --file "dist/pq-backend.exe" \
             --description "PersonalQuery Backend" \
             --description-url "https://github.com/HASEL-UZH/PersonalQuery"
+        env:
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
 
       # macOS: Sign backend executable
       - name: Sign backend executable (macOS)
         if: startsWith(matrix.os, 'macos')
         working-directory: src/py-backend
         run: |
-          # Capture the first Developer ID Application identity
           SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
           echo "Using signing identity: $SIGN_ID"
 
           codesign --deep --force --options runtime --timestamp \
             --sign "$SIGN_ID" \
             dist/pq-backend
-      
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # macOS: Verify signature
       - name: Verify macOS signature
@@ -116,6 +124,9 @@ jobs:
         working-directory: src/py-backend
         run: |
           codesign --verify --deep --strict --verbose=2 dist/pq-backend
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # ------------------------------------------------
       # Electron build (as in original workflow)
