@@ -79,10 +79,11 @@ jobs:
             Write-Host "File found, resolved path: $resolved"
             Write-Host "File metadata:"
             Get-Item $resolved | Format-List *
-          
+
             AzureSignTool sign `
               -kvu "${AZURE_ENDPOINT}" `
               -kvi "${AZURE_CLIENT_ID}" `
+              -kvt "${AZURE_TENANT_ID}" `
               -kvs "${AZURE_CLIENT_SECRET}" `
               -kvc "${AZURE_CERT_PROFILE_NAME}" `
               -tr http://timestamp.digicert.com `
