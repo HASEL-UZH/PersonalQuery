@@ -286,7 +286,8 @@ app.on('before-quit', async (event): Promise<void> => {
     await Promise.all([
       trackers.stopAllTrackers(),
       UsageDataService.createNewUsageDataEvent(UsageDataEventType.AppQuit),
-      sessionService.createOrUpdateSessionFromEvent(UsageDataEventType.AppQuit, new Date())
+      sessionService.createOrUpdateSessionFromEvent(UsageDataEventType.AppQuit, new Date()),
+      WindowActivityTrackerService.finalizeCurrentWindow()
     ]);
     LOG.info(`All trackers stopped. Running: ${trackers.getRunningTrackerNames().length}`);
     isAppQuitting = true;

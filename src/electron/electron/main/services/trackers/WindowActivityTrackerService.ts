@@ -37,6 +37,19 @@ export class WindowActivityTrackerService {
     this.prevWindowTsStart = savedEntity.tsStart;
   }
 
+  public static async finalizeCurrentWindow(): Promise<void> {
+    if (this.prevWindowId && this.prevWindowTsStart) {
+      const now = new Date();
+      const duration = Math.floor((now.getTime() - this.prevWindowTsStart.getTime()) / 1000);
+      await WindowActivityEntity.update(this.prevWindowId, {
+        tsEnd: now,
+        durationInSeconds: duration
+      });
+      this.prevWindowId = null;
+      this.prevWindowTsStart = null;
+    }
+  }
+
   public async getMostRecentWindowActivityDtos(itemCount: number): Promise<WindowActivityDto[]> {
     const items = await WindowActivityEntity.find({
       order: { createdAt: 'DESC' },

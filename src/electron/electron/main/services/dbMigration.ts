@@ -191,20 +191,36 @@ export function addWindowActivityDurations(db: Database.Database): void {
     .all();
   LOG.info(`Loaded ${rows.length} window_activity rows.`);
 
-  const appQuitsRaw = db
+  const usageRows = db
     .prepare(
       `
-    SELECT created_at FROM usage_data WHERE type = 'APP_QUIT'
+    SELECT created_at, type
+    FROM usage_data
+    WHERE type IN ('APP_START', 'APP_QUIT')
+    ORDER BY created_at ASC
   `
     )
     .all();
-  LOG.info(`Loaded ${appQuitsRaw.length} APP_QUIT events.`);
+  LOG.info(`Loaded ${usageRows.length} APP_START/APP_QUIT events.`);
 
-  const appQuitByDay = new Map<string, Date>();
-  for (const { created_at } of appQuitsRaw) {
+  // Build session ranges
+  const sessionRanges: { start: Date; end: Date | null }[] = [];
+  let currentStart: Date | null = null;
+  for (const { created_at, type } of usageRows) {
     const dt = parseISO(created_at);
-    appQuitByDay.set(dt.toISOString().substring(0, 10), dt);
+    if (type === 'APP_START') {
+      if (currentStart === null) {
+        currentStart = dt;
+      }
+    } else if (type === 'APP_QUIT' && currentStart) {
+      sessionRanges.push({ start: currentStart, end: dt });
+      currentStart = null;
+    }
   }
+  if (currentStart) {
+    sessionRanges.push({ start: currentStart, end: null });
+  }
+  LOG.info(`Constructed ${sessionRanges.length} session ranges.`);
 
   const updateStmt = db.prepare(
     `
@@ -215,38 +231,63 @@ export function addWindowActivityDurations(db: Database.Database): void {
   );
 
   let updatedCount = 0;
-  const updates = [];
+  const updates: [number, string, number][] = [];
 
-  for (let i = 0; i < rows.length - 1; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const { rowid, tsStart } = rows[i];
-    const nextTs = rows[i + 1].tsStart;
+    if (!tsStart) continue;
 
-    if (!tsStart || !nextTs) continue;
+    let startDt: Date;
+    try {
+      startDt = parseISO(tsStart);
+    } catch (e) {
+      LOG.warn(`Skipping row ${rowid}: invalid tsStart "${tsStart}"`);
+      continue;
+    }
 
-    const startDt = parseISO(tsStart);
-    let endDt = parseISO(nextTs);
+    // Find session containing this record
+    const session = sessionRanges.find(
+      (s) => s.start <= startDt && (!s.end || startDt < s.end)
+    );
 
-    if (startDt.toISOString().substring(0, 10) !== endDt.toISOString().substring(0, 10)) {
-      const quitDt = appQuitByDay.get(startDt.toISOString().substring(0, 10));
-      if (quitDt && startDt < quitDt && quitDt < endDt) {
-        endDt = quitDt;
+    const candidateEndTimes: Date[] = [];
+
+    // Next window timestamp
+    if (i < rows.length - 1) {
+      const nextTs = rows[i + 1].tsStart;
+      if (nextTs) {
+        try {
+          const parsedNext = parseISO(nextTs);
+          if (parsedNext > startDt) {
+            candidateEndTimes.push(parsedNext);
+          }
+        } catch (e) {
+          LOG.warn(`Skipping invalid next tsStart "${nextTs}"`);
+        }
       }
     }
 
-    const duration = Math.floor((endDt.getTime() - startDt.getTime()) / 1000);
+    // APP_QUIT timestamp (session end)
+    if (session && session.end && session.end > startDt) {
+      candidateEndTimes.push(session.end);
+    }
+
+    if (candidateEndTimes.length === 0) {
+      // No end timestamp — leave duration NULL
+      LOG.info(`Leaving row ${rowid} unmodified (no end timestamp).`);
+      continue;
+    }
+
+    const endDt = candidateEndTimes.reduce((a, b) => (a < b ? a : b));
+    const rawDuration = endDt.getTime() - startDt.getTime();
+
+    if (rawDuration <= 0) {
+      LOG.warn(`Skipping row ${rowid}: negative or zero duration`);
+      continue;
+    }
+
+    const duration = Math.floor(rawDuration / 1000);
     updates.push([duration, format(endDt, 'yyyy-MM-dd HH:mm:ss.SSS'), rowid]);
-  }
-
-  if (rows.length > 0) {
-    const { rowid, tsStart } = rows[rows.length - 1];
-    if (tsStart) {
-      const startDt = parseISO(tsStart);
-      const quitDt = appQuitByDay.get(startDt.toISOString().substring(0, 10));
-      if (quitDt && quitDt > startDt) {
-        const duration = Math.floor((quitDt.getTime() - startDt.getTime()) / 1000);
-        updates.push([duration, format(quitDt, 'yyyy-MM-dd HH:mm:ss.SSS'), rowid]);
-      }
-    }
   }
 
   const updateTransaction = db.transaction(() => {
