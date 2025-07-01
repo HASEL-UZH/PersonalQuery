@@ -48,13 +48,20 @@ export class WindowService {
       }
     );
     if (!is.dev) {
-      const hiddenMenu = Menu.buildFromTemplate([
+      const appMenu = Menu.buildFromTemplate([
+        {
+          label: 'Edit',
+          submenu: [
+            { role: 'copy', accelerator: 'CmdOrCtrl+C' },
+            { role: 'paste', accelerator: 'CmdOrCtrl+V' }
+          ]
+        },
         {
           label: 'Tools',
           submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }]
         }
       ]);
-      Menu.setApplicationMenu(hiddenMenu);
+      Menu.setApplicationMenu(appMenu);
     }
   }
 
@@ -435,6 +442,10 @@ export class WindowService {
     menuTemplate[1].enabled = updaterMenuEnabled;
 
     this.tray.setContextMenu(Menu.buildFromTemplate(menuTemplate));
+
+    this.tray.on('click', () => {
+      this.createChatWindow();
+    });
 
     this.tray.on('right-click', () => {
       this.tray.popUpContextMenu();

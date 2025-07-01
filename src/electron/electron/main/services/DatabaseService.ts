@@ -45,7 +45,7 @@ export class DatabaseService {
     let options: DataSourceOptions = {
       type: 'better-sqlite3',
       database: this.dbPath,
-      synchronize: false,
+      synchronize: true,
       logging: false,
       entities: entities
     };
