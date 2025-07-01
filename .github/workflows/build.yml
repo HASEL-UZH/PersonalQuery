@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
+          #- os: windows-latest FIXME
           - os: macos-latest
             mac_arch: arm64
           - os: macos-latest
@@ -49,7 +49,8 @@ jobs:
         working-directory: src/py-backend
         run: poetry install --no-root
 
-      - name: Build backend executable
+      - name: Build backend executable (Windows)
+        if: matrix.os == 'windows-latest'
         working-directory: src/py-backend
         run: poetry run pyinstaller personalquery-backend.spec
         env:
@@ -59,7 +60,7 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Sign backend executable with Trusted Signing
+      - name: Sign backend executable with Trusted Signing (Windows)
         if: matrix.os == 'windows-latest'
         uses: azure/trusted-signing-action@v0
         with:
@@ -75,7 +76,7 @@ jobs:
           timestamp-rfc3161: http://timestamp.digicert.com
           timestamp-digest: SHA256
 
-      - name: Import macOS code signing certificate
+      - name: Import code signing certificate (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
           echo "${CSC_LINK}" | base64 --decode > certificate.p12
@@ -88,37 +89,27 @@ jobs:
           CSC_LINK: ${{ secrets.SCS_HASH }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
-      - name: Sign backend executable and dependencies (macOS)
+      - name: Build backend executable with PyInstaller and codesign (macOS)
         if: startsWith(matrix.os, 'macos')
         working-directory: src/py-backend
         run: |
           SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
           echo "Using signing identity: $SIGN_ID"
 
-          # Sign any dylibs
-          find dist -name '*.dylib' -print -exec \
-            codesign --force --options runtime --timestamp --sign "$SIGN_ID" {} \;
-
-          # Sign Python if extracted here
-          if [ -f dist/Python ]; then
-            codesign --force --options runtime --timestamp --sign "$SIGN_ID" dist/Python
-          fi
-
-          # Finally sign the binary
-          codesign --deep --force --options runtime --timestamp \
-            --sign "$SIGN_ID" dist/pq-backend
-
-          # Verify everything
-          codesign --verify --deep --strict --verbose=2 dist/pq-backend
+          poetry run pyinstaller personalquery-backend.spec \
+            --codesign-identity "$SIGN_ID" \
+            --osx-entitlements-file ../build/entitlements.mac.plist
+        env:
+          LANGSMITH_TRACING: false
+          LANGSMITH_ENDPOINT: https://api.smith.langchain.com
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_PROJECT: personalQuery
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Verify macOS signature
         if: startsWith(matrix.os, 'macos')
         working-directory: src/py-backend
-        run: |
-          codesign --verify --deep --strict --verbose=2 dist/pq-backend
-        env:
-          CSC_LINK: ${{ secrets.SCS_HASH }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: codesign --verify --deep --strict --verbose=4 dist/pq-backend
 
       # ------------------------------------------------
       # Electron build (as in original workflow)

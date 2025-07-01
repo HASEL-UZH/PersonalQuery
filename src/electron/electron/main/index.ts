@@ -264,6 +264,7 @@ app.whenReady().then(async () => {
 
 let isAppQuitting = false;
 app.on('before-quit', async (event): Promise<void> => {
+
   if (backendProcess) {
     const pid = backendProcess.pid;
     LOG.info(`Killing backend process with PID: ${pid}`);
