@@ -101,10 +101,10 @@ jobs:
             --name=pq-backend \
             --onefile \
             --icon=../build/icon.ico \
-            --version-file=../build/file_version.txt \
+            --version-file=/build/file_version.txt \
             --add-data="src/*.py:." \
             --codesign-identity "$SIGN_ID" \
-            --osx-entitlements-file ../build/entitlements.mac.plist
+            --osx-entitlements-file /build/entitlements.mac.plist
         env:
           LANGSMITH_TRACING: false
           LANGSMITH_ENDPOINT: https://api.smith.langchain.com
