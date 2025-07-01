@@ -114,10 +114,13 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
-  fetchChats();
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('refreshSidebar', (e: any) => {
     chats.value = sortChatsByLastActivity(e.detail);
+  });
+
+  window.addEventListener('backendReady', async () => {
+    await fetchChats();
   });
 });
 
@@ -129,7 +132,6 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex h-screen w-64 flex-col gap-2 bg-base-200 p-4">
     <button class="btn btn-primary mb-2 w-full" @click="createNewChat">+ New Chat</button>
-
     <div class="flex-1 space-y-2 overflow-y-auto">
       <div v-for="chat in chats" :key="chat.id" class="group relative flex items-center">
         <!-- Chat title button -->

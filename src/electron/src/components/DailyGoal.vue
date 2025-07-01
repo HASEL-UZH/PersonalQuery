@@ -22,6 +22,7 @@ const goals = [
 ];
 
 const selectedGoal = ref('');
+const visible = ref(false);
 
 // Utility to get today in YYYY-MM-DD format
 function getTodayDate() {
@@ -29,6 +30,10 @@ function getTodayDate() {
 }
 
 onMounted(() => {
+  window.addEventListener('backendReady', () => {
+    visible.value = true;
+  });
+
   // Load expanded state
   const storedExpanded = localStorage.getItem('dailyGoalExpanded');
   if (storedExpanded !== null) {
@@ -73,7 +78,7 @@ watch(expanded, (newValue) => {
 
 <template>
   <!-- Always visible toggle button (collapsed or expanded) -->
-  <div class="fixed left-0 top-4 z-50 ml-[17rem]">
+  <div v-if="visible" class="fixed left-0 top-4 z-50 ml-[17rem]">
     <div
       v-if="expanded"
       class="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-lg transition-all duration-300"
