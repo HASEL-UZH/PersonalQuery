@@ -76,16 +76,18 @@ jobs:
           $file = "$env:GITHUB_WORKSPACE\src\py-backend\dist\pq-backend.exe"
           if (Test-Path $file) {
             $resolved = (Resolve-Path $file).Path
-            Write-Host "File found, signing: $resolved"
+            Write-Host "File found, resolved path: $resolved"
+            Write-Host "File metadata:"
+            Get-Item $resolved | Format-List *
+          
             AzureSignTool sign `
-              --azure-key-vault-url "${AZURE_ENDPOINT}" `
-              --azure-key-vault-client-id "${AZURE_CLIENT_ID}" `
-              --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" `
-              --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" `
-              --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" `
-              --file $resolved `
-              --description "PersonalQuery Backend" `
-              --description-url "https://github.com/HASEL-UZH/PersonalQuery"
+              -kvu "${AZURE_ENDPOINT}" `
+              -kvi "${AZURE_CLIENT_ID}" `
+              -kvs "${AZURE_CLIENT_SECRET}" `
+              -kvc "${AZURE_CERT_PROFILE_NAME}" `
+              -tr http://timestamp.digicert.com `
+              -v `
+              "$resolved"
           } else {
             Write-Host "File not found, skipping signing."
           }
@@ -96,18 +98,6 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
-
-      # FIXME
-      - name: Debug SCS_HASH length
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          if [ -z "${SCS_HASH}" ]; then
-            echo "ERROR: SCS_HASH is empty!"
-            exit 1
-          fi
-          echo "SCS_HASH is set. Length: ${#SCS_HASH}"
-        env:
-          SCS_HASH: ${{ secrets.SCS_HASH }}
 
       - name: Import macOS code signing certificate
         if: startsWith(matrix.os, 'macos')
