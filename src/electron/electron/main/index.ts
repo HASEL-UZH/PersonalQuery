@@ -17,16 +17,15 @@ import { IpcHandler } from '../ipc/IpcHandler';
 import { ipcMain } from 'electron';
 import { ExperienceSamplingService } from './services/ExperienceSamplingService';
 import studyConfig from '../../shared/study.config';
-import { is, waitForBackendReady } from './services/utils/helpers';
+import { is } from './services/utils/helpers';
 import { Settings } from './entities/Settings';
 import { UsageDataService } from './services/UsageDataService';
 import { UsageDataEventType } from '../enums/UsageDataEventType.enum';
 import { WorkScheduleService } from './services/WorkScheduleService';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SessionService } from './services/SessionService';
-import treeKill from 'tree-kill';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -264,11 +263,21 @@ app.whenReady().then(async () => {
 
 let isAppQuitting = false;
 app.on('before-quit', async (event): Promise<void> => {
-
   if (backendProcess) {
     const pid = backendProcess.pid;
     LOG.info(`Killing backend process with PID: ${pid}`);
-    treeKill(pid);
+
+    // Use taskkill to ensure subprocesses are killed
+    exec(`taskkill /PID ${pid} /T /F`, (err, stdout, stderr) => {
+      if (err) {
+        LOG.error(`taskkill error: ${err.message}`);
+        return;
+      }
+      if (stderr) {
+        LOG.error(`taskkill stderr: ${stderr}`);
+      }
+      LOG.info(`taskkill stdout: ${stdout}`);
+    });
   }
   LOG.info('app.on(before-quit) called');
   if (!isAppQuitting) {
