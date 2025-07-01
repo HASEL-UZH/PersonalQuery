@@ -34,7 +34,10 @@ async function pasteFromClipboard() {
 <template>
   <div class="flex min-h-screen flex-col items-center justify-center px-4">
     <h2 class="mb-4 text-2xl font-semibold">Enter OpenAI API Key</h2>
-
+    <p class="mb-4 max-w-xl text-sm">
+      Please enter the API key sent to you by email. It will be saved locally, and the application
+      will restart. This may take a moment the first time.
+    </p>
     <div class="flex w-full">
       <input
         v-model="apiKey"
@@ -42,9 +45,10 @@ async function pasteFromClipboard() {
         placeholder="Enter your API Key..."
       />
       <button
-        class="btn mt-0 flex rounded-l-none bg-gray-200 px-4 hover:bg-gray-300"
+        class="btn tooltip mt-0 flex rounded-l-none bg-gray-200 px-4 hover:bg-gray-300"
         @click="pasteFromClipboard"
         title="Paste from clipboard"
+        data-tip="Paste"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -69,12 +73,4 @@ async function pasteFromClipboard() {
   </div>
 </template>
 
-<style scoped lang="less">
-.setup-env {
-  padding: 1em;
-}
-button {
-  margin-top: 1em;
-  padding: 0.5em 1em;
-}
-</style>
+<style scoped lang="less"></style>

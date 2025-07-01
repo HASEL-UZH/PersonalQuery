@@ -203,8 +203,6 @@ export class WindowService {
     const preload = join(__dirname, '../preload/index.mjs');
 
     this.chatWindow = new BrowserWindow({
-      width: 1000,
-      height: 850,
       show: false,
       resizable: true,
       fullscreenable: true,
@@ -214,6 +212,8 @@ export class WindowService {
       }
     });
 
+    this.chatWindow.maximize();
+
     if (process.env.VITE_DEV_SERVER_URL) {
       await this.chatWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/chat`);
     } else {
@@ -222,10 +222,13 @@ export class WindowService {
       });
     }
 
+    this.chatWindow.once('ready-to-show', () => {
+      this.chatWindow.show();
+    });
+
     this.chatWindow.on('close', () => {
       this.chatWindow = null;
     });
-    this.chatWindow.show();
   }
 
   public closeOnboardingWindow() {

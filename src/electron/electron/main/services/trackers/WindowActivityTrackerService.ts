@@ -12,22 +12,17 @@ export class WindowActivityTrackerService {
   private static prevWindowId: string;
 
   public static async handleWindowChange(window: ActiveWindow): Promise<void> {
-    // Only store activities with a title or URL
     if (!window.windowTitle && !window.url) {
       return;
     }
-    // Finalize the previous window entry
     if (this.prevWindowId && this.prevWindowTsStart) {
-      const duration = Math.floor(
-        (window.tsStart.getTime() - this.prevWindowTsStart.getTime()) / 1000
-      );
+      const duration = Math.floor((window.ts.getTime() - this.prevWindowTsStart.getTime()) / 1000);
 
       await WindowActivityEntity.update(this.prevWindowId, {
-        tsEnd: window.tsStart,
+        tsEnd: window.ts,
         durationInSeconds: duration
       });
     }
-    // Save the current window as a new activity entry
     const entity: DeepPartial<WindowActivityEntity> = {
       windowTitle: window.windowTitle,
       processName: window.process,
@@ -35,7 +30,7 @@ export class WindowActivityTrackerService {
       processId: window.processId,
       url: window.url,
       activity: window.activity,
-      tsStart: window.tsStart
+      tsStart: window.ts
     };
     const savedEntity = (await WindowActivityEntity.save(entity)) as WindowActivityEntity;
     this.prevWindowId = savedEntity.id;

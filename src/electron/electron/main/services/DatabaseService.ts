@@ -12,11 +12,7 @@ import { WorkDayEntity } from '../entities/WorkDayEntity';
 import { SessionEntity } from '../entities/SessionEntity';
 import fs from 'node:fs';
 import CoverageScore from '../../../shared/CoverageScore';
-import {
-  addWindowActivityDurations,
-  performDatabaseMigration,
-  updateSessionsFromUsageData
-} from './dbMigration';
+import { addWindowActivityDurations, updateSessionsFromUsageData } from './dbMigration';
 import Database from 'better-sqlite3';
 
 const LOG = getMainLogger('DatabaseService');
