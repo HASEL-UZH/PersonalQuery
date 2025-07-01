@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
-          #- os: windows-latest FIXME
+          - os: windows-latest
           - os: macos-latest
             mac_arch: arm64
           - os: macos-latest
