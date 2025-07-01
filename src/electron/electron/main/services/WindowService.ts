@@ -435,10 +435,7 @@ export class WindowService {
     menuTemplate[1].enabled = updaterMenuEnabled;
 
     this.tray.setContextMenu(Menu.buildFromTemplate(menuTemplate));
-    this.tray.on('click', () => {
-      this.createChatWindow();
-    });
-
+    
     this.tray.on('right-click', () => {
       this.tray.popUpContextMenu();
     });
