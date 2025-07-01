@@ -304,15 +304,18 @@ async def run_chat(question: str,
                  "additional_kwargs": answer.additional_kwargs
                  }
     if branch != "general_qa" and (not auto_approve or not auto_sql):
-        if websocket:
-            await websocket.send_json({
-                "type": "interruption",
-                "reason": {"auto_sql": auto_sql, "auto_approve": auto_approve},
-                "query": query,
-                "data": data,
-                "chat_id": chat_id
-            })
-            return {}
+        if len(data) > 0:
+            if websocket:
+                await websocket.send_json({
+                    "type": "interruption",
+                    "reason": {"auto_sql": auto_sql, "auto_approve": auto_approve},
+                    "query": query,
+                    "data": data,
+                    "chat_id": chat_id
+                })
+                return {}
+        else:
+            await resume_stream(chat_id, [], websocket)
 
     return final_msg
 
