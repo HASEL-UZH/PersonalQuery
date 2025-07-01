@@ -16,7 +16,7 @@ const props = defineProps<{
 const globalSearch = ref('');
 const searchTerms = ref('');
 
-function escapeRegExp(string) {
+function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
