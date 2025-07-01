@@ -26,6 +26,7 @@ import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SessionService } from './services/SessionService';
+import treeKill from 'tree-kill';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -77,6 +78,20 @@ function startBackend() {
     LOG.error(`[Backend ERROR] ${err}`);
   });
   return newBackend;
+}
+
+function stopBackend(): void {
+  if (!backendProcess) {
+    return;
+  }
+  const pid = backendProcess.pid;
+  LOG.info(`Killing backend process with PID: ${pid}`);
+  treeKill(pid, 'SIGTERM', (err) => {
+    if (err) {
+      LOG.error(`Error killing backend process: ${err}`);
+    }
+  });
+  backendProcess = null;
 }
 
 globalThis.backendProcess = backendProcess;
@@ -263,22 +278,7 @@ app.whenReady().then(async () => {
 
 let isAppQuitting = false;
 app.on('before-quit', async (event): Promise<void> => {
-  if (backendProcess) {
-    const pid = backendProcess.pid;
-    LOG.info(`Killing backend process with PID: ${pid}`);
-
-    // Use taskkill to ensure subprocesses are killed
-    exec(`taskkill /PID ${pid} /T /F`, (err, stdout, stderr) => {
-      if (err) {
-        LOG.error(`taskkill error: ${err.message}`);
-        return;
-      }
-      if (stderr) {
-        LOG.error(`taskkill stderr: ${stderr}`);
-      }
-      LOG.info(`taskkill stdout: ${stdout}`);
-    });
-  }
+  stopBackend();
   LOG.info('app.on(before-quit) called');
   if (!isAppQuitting) {
     event.preventDefault();
