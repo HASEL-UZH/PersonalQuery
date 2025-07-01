@@ -275,19 +275,27 @@ async def run_chat(question: str,
     if websocket:
         await websocket.send_json({"type": "step", "node": "classify question"})
 
-    async for step in graph.astream(state, config, stream_mode="updates", interrupt_after=interrupt_nodes):
-        node_name = list(step.keys())[0]
-        if node_name == "write_query":
-            query = step[node_name].get("query")
-        if node_name == "execute_query":
-            data = step[node_name].get("raw_result")
-        if node_name != "__interrupt__":
-            step_state = step[node_name]
-            branch = step_state.get("branch")
-            if websocket:
-                next_step = give_correct_step(node_name, step_state)
-                await websocket.send_json({"type": "step", "node": next_step})
-                await asyncio.sleep(0)
+    try:
+        async for step in graph.astream(state, config, stream_mode="updates", interrupt_after=interrupt_nodes):
+            node_name = list(step.keys())[0]
+            if node_name == "write_query":
+                query = step[node_name].get("query")
+            if node_name == "execute_query":
+                data = step[node_name].get("raw_result")
+            if node_name != "__interrupt__":
+                step_state = step[node_name]
+                branch = step_state.get("branch")
+                if websocket:
+                    next_step = give_correct_step(node_name, step_state)
+                    await websocket.send_json({"type": "step", "node": next_step})
+                    await asyncio.sleep(0)
+    except Exception as e:
+        logging.error(f"[run_chat] Failed for chat_id={chat_id}: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
+        return {"error": "resume failed"}
 
     answer = state['messages'][-1]
     final_msg = {"id": answer.id,
@@ -339,7 +347,11 @@ async def resume_stream(chat_id: str, data, websocket) -> Dict:
                 }
         await websocket.send_json(final_msg)
     except Exception as e:
-        logging.error(f"[resume_stream] Failed for chat_id={chat_id}: {e}")
+        logging.error(f"[resume_stream (approval)] Failed for chat_id={chat_id}: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
         return {"error": "resume failed"}
 
 
@@ -369,7 +381,11 @@ async def update_sql_data(chat_id: str, query, data, websocket):
                 }
         await websocket.send_json(final_msg)
     except Exception as e:
-        logging.error(f"[resume_stream] Failed for chat_id={chat_id}: {e}")
+        logging.error(f"[resume_stream (sql)] Failed for chat_id={chat_id}: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
         return {"error": "resume failed"}
 
 

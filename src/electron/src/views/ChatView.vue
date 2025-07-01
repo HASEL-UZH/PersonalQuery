@@ -12,6 +12,7 @@ import SQLReviewBox from '../components/SQLReviewBox.vue';
 import typedIpcRenderer from '../utils/typedIpcRenderer';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
+import { data } from 'autoprefixer';
 
 const route = useRoute();
 const chatId = ref(route.params.chatId as string);
@@ -211,7 +212,7 @@ watch(interruptionMeta, () => {
     needsSQLReview.value = !interruptionMeta.value.reason.auto_sql;
     reviewMeta.value = {
       chat_id: interruptionMeta.value.chat_id,
-      data: interruptionMeta.value.data,
+      data: JSON.parse(JSON.stringify(interruptionMeta.value.data)),
       query: interruptionMeta.value.query
     };
     console.log('reviewMeta.value', reviewMeta.value);
@@ -420,6 +421,13 @@ function resetQuery() {
     reviewMeta.value.query = interruptionMeta.value!.query;
   }
 }
+function resetData() {
+  console.log('resetting:', reviewMeta.value?.data);
+  console.log('with:', interruptionMeta.value?.data);
+  if (reviewMeta.value) {
+    reviewMeta.value.data = interruptionMeta.value!.data;
+  }
+}
 
 async function handleLLMCorrection(instruction: string, query: string) {
   if (!interruptionMeta.value) return;
@@ -606,6 +614,16 @@ onMounted(async () => {
             </p>
           </div>
         </div>
+        <!-- Error message -->
+        <div
+          v-else-if="msg.role === 'system' && msg.error"
+          class="mb-4 flex w-full justify-center px-4"
+        >
+          <div
+            class="prose mx-auto w-full max-w-4xl rounded-lg border border-white/10 px-6 py-5 text-left leading-tight text-base-content text-error"
+            v-html="msg.content"
+          />
+        </div>
         <!-- AI message -->
         <div v-else-if="msg.role === 'ai'" class="mb-4 flex w-full justify-center px-4">
           <div
@@ -777,6 +795,7 @@ onMounted(async () => {
             :data="reviewMeta?.data ?? []"
             @approve="respondToApproval"
             @cell-edit-complete="onCellEditComplete"
+            @reset="resetData"
           />
         </div>
       </div>

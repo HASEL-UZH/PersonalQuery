@@ -17,6 +17,7 @@ export interface Message {
   role: Role;
   content: string;
   meta?: Meta;
+  error?: boolean;
 }
 
 export function useChatWebSocket() {
@@ -116,6 +117,15 @@ export function useChatWebSocket() {
             onFinalResponse.value();
           }
           steps.value = [];
+        } else if (data.type === 'error') {
+          console.log('error in backend:', data.message);
+          steps.value = [];
+
+          messages.value.push({
+            role: 'system',
+            content: `An error in occured: ${data.message}`,
+            error: true
+          });
         }
       };
     });
