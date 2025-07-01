@@ -10,9 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from chains.query_chain import correct_query, execute_corrected_query
 from chat_engine import run_chat, get_chat_history, initialize, delete_chat, rename_chat, resume_stream, \
     update_sql_data, store_feedback
-from database import DB_PATH
 from helper.chat_utils import get_next_thread_id, list_chats
-from helper.db_modification import update_sessions_from_usage_data, add_window_activity_durations
 from schemas import AnswerDetail, WantsPlot
 
 
@@ -147,16 +145,6 @@ async def confirm_query(request: Request):
 
     msg = await update_sql_data(chat_id, query, data, active_websocket)
     return msg
-
-
-@app.post("/initialize-data")
-def initialize_data():
-    try:
-        update_sessions_from_usage_data(DB_PATH)
-        add_window_activity_durations(DB_PATH)
-        return {"status": "success"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
 
 
 @app.post("/feedback")

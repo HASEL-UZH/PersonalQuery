@@ -1,6 +1,4 @@
 import math
-from typing import List, Any
-
 
 def escape_md_cell(value: str) -> str:
     return f"`{value.replace('`', '')}`" if "|" in value or "\n" in value else value

@@ -1,6 +1,5 @@
 from langchain import hub
 from langchain_core.output_parsers import PydanticToolsParser
-from langchain_openai import ChatOpenAI
 
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry

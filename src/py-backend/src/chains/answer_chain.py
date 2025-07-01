@@ -92,9 +92,6 @@ async def generate_answer(state: State, config: dict) -> State:
         stream = llm.astream(temp_messages)
     else:
         stream = llm.astream(prompt.to_string())
-        messages2 = [
-            {"role": "system", "content": prompt.messages[0].content}
-        ]
 
     final_msg = AIMessage(content="")
 
