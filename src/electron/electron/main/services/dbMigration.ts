@@ -157,6 +157,8 @@ export function updateSessionsFromUsageData(db: Database.Database): void {
 }
 
 export function addWindowActivityDurations(db: Database.Database): void {
+  const MAX_DURATION_SECONDS = 3600; // 1 hour
+
   const columns = db.prepare(`PRAGMA table_info(window_activity)`).all();
   const colNames = columns.map((c) => c.name);
 
@@ -286,7 +288,14 @@ export function addWindowActivityDurations(db: Database.Database): void {
       continue;
     }
 
-    const duration = Math.floor(rawDuration / 1000);
+    let duration = Math.floor(rawDuration / 1000);
+    if (duration > MAX_DURATION_SECONDS) {
+      LOG.info(
+        `Capping duration for row ${rowid}: original duration ${duration}s exceeds limit (${MAX_DURATION_SECONDS}s)`
+      );
+      duration = MAX_DURATION_SECONDS;
+    }
+
     updates.push([duration, format(endDt, 'yyyy-MM-dd HH:mm:ss.SSS'), rowid]);
   }
 

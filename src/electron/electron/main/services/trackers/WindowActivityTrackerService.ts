@@ -5,6 +5,7 @@ import getMainLogger from '../../../config/Logger';
 import WindowActivityDto from '../../../../shared/dto/WindowActivityDto';
 
 const LOG = getMainLogger('WindowActivityTrackerService');
+const MAX_DURATION = 3600;
 
 export class WindowActivityTrackerService {
   private randomStringMap: Map<string, string> = new Map<string, string>();
@@ -18,9 +19,11 @@ export class WindowActivityTrackerService {
     if (this.prevWindowId && this.prevWindowTsStart) {
       const duration = Math.floor((window.ts.getTime() - this.prevWindowTsStart.getTime()) / 1000);
 
+      const finalDuration = Math.min(duration, MAX_DURATION);
+
       await WindowActivityEntity.update(this.prevWindowId, {
         tsEnd: window.ts,
-        durationInSeconds: duration
+        durationInSeconds: finalDuration
       });
     }
     const entity: DeepPartial<WindowActivityEntity> = {
@@ -41,9 +44,10 @@ export class WindowActivityTrackerService {
     if (this.prevWindowId && this.prevWindowTsStart) {
       const now = new Date();
       const duration = Math.floor((now.getTime() - this.prevWindowTsStart.getTime()) / 1000);
+      const finalDuration = Math.min(duration, MAX_DURATION);
       await WindowActivityEntity.update(this.prevWindowId, {
         tsEnd: now,
-        durationInSeconds: duration
+        durationInSeconds: finalDuration
       });
       this.prevWindowId = null;
       this.prevWindowTsStart = null;
