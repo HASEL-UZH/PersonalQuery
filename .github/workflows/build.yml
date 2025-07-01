@@ -41,30 +41,6 @@ jobs:
       - name: Install Poetry
         run: pip install poetry
 
-      - name: Debug AzureSignTool environment
-        if: matrix.os == 'windows-latest'
-        run: |
-          echo "AZURE_ENDPOINT=${env:AZURE_ENDPOINT}"
-          echo "AZURE_CLIENT_ID=${env:AZURE_CLIENT_ID}"
-          echo "AZURE_TENANT_ID=${env:AZURE_TENANT_ID}"
-          if ($env:AZURE_CLIENT_SECRET) {
-            echo "AZURE_CLIENT_SECRET length: $(${env:AZURE_CLIENT_SECRET}.Length)"
-          } else {
-            echo "AZURE_CLIENT_SECRET is empty"
-          }
-          echo "AZURE_CERT_PROFILE_NAME=${env:AZURE_CERT_PROFILE_NAME}"
-
-          Write-Host "Stopping early after debug output."
-          exit 1
-        shell: pwsh
-        env:
-          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
-
-
       # ------------------------------------------------
       # Backend build (runs BEFORE Electron packaging)
       # ------------------------------------------------
@@ -83,46 +59,21 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Install AzureSignTool
+      - name: Azure Login
         if: matrix.os == 'windows-latest'
-        run: dotnet tool install --global AzureSignTool
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      - name: Add .NET tools to PATH
+      - name: Sign backend executable with Trusted Signing
         if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
-
-      # Windows: Sign backend executable
-      - name: Sign backend executable (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          $file = "$env:GITHUB_WORKSPACE\src\py-backend\dist\pq-backend.exe"
-          if (Test-Path $file) {
-            $resolved = (Resolve-Path $file).Path
-            Write-Host "File found, resolved path: $resolved"
-            Write-Host "File metadata:"
-            Get-Item $resolved | Format-List *
-
-            AzureSignTool sign `
-              -kvu "${AZURE_ENDPOINT}" `
-              -kvi "${AZURE_CLIENT_ID}" `
-              -kvt "${AZURE_TENANT_ID}" `
-              -kvs "${AZURE_CLIENT_SECRET}" `
-              -kvc "${AZURE_CERT_PROFILE_NAME}" `
-              -tr http://timestamp.digicert.com `
-              -v `
-              "$resolved"
-          } else {
-            Write-Host "File not found, skipping signing."
-          }
-        shell: pwsh
-        env:
-          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+        uses: azure/trusted-signing-action@v1
+        with:
+          certificate-profile: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files-folder: src\py-backend\dist
 
       - name: Import macOS code signing certificate
         if: startsWith(matrix.os, 'macos')
