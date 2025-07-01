@@ -45,7 +45,6 @@ module.exports = {
     hardenedRuntime: true,
     gatekeeperAssess: false,
     notarize: false,
-    sign: false,
     extendInfo: [
       {
         key: 'NSAppleEventsUsageDescription',

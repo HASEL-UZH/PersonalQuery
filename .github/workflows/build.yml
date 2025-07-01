@@ -59,84 +59,91 @@ jobs:
           LANGSMITH_PROJECT: personalQuery
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      #      # macOS: Import signing certificate FIXME
-      #      - name: Import macOS code signing certificate
-      #        if: startsWith(matrix.os, 'macos')
-      #        run: |
-      #          echo "${CSC_LINK}" > certificate.p12
-      #          security create-keychain -p "" build.keychain
-      #          security default-keychain -s build.keychain
-      #          security unlock-keychain -p "" build.keychain
-      #          security import certificate.p12 -k build.keychain -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
-      #          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-      #        env:
-      #          CSC_LINK: ${{ secrets.CSC_LINK }}
-      #          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      - name: Install AzureSignTool
+        if: matrix.os == 'windows-latest'
+        run: dotnet tool install --global AzureSignTool
 
-      #      - name: Install AzureSignTool
-      #        if: matrix.os == 'windows-latest'
-      #        run: dotnet tool install --global AzureSignTool
-      #
-      #      - name: Add .NET tools to PATH
-      #        if: matrix.os == 'windows-latest'
-      #        shell: pwsh
-      #        run: |
-      #          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
-      #
-      #      # Windows: Sign backend executable
-      #      - name: Sign backend executable (Windows)
-      #        if: matrix.os == 'windows-latest'
-      #        run: |
-      #          $file = "$env:GITHUB_WORKSPACE\src\py-backend\dist\pq-backend.exe"
-      #          if (Test-Path $file) {
-      #            Write-Host "File found, signing: $file"
-      #            AzureSignTool sign `
-      #              --azure-key-vault-url "${AZURE_ENDPOINT}" `
-      #              --azure-key-vault-client-id "${AZURE_CLIENT_ID}" `
-      #              --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" `
-      #              --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" `
-      #              --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" `
-      #              --file "$file" `
-      #              --description "PersonalQuery Backend" `
-      #              --description-url "https://github.com/HASEL-UZH/PersonalQuery"
-      #          } else {
-      #            Write-Host "File not found, skipping signing."
-      #          }
-      #        shell: pwsh
-      #        env:
-      #          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
-      #          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      #          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      #          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      #          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+      - name: Add .NET tools to PATH
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
 
+      # Windows: Sign backend executable
+      - name: Sign backend executable (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $file = "$env:GITHUB_WORKSPACE\src\py-backend\dist\pq-backend.exe"
+          if (Test-Path $file) {
+            $resolved = (Resolve-Path $file).Path
+            Write-Host "File found, signing: $resolved"
+            AzureSignTool sign `
+              --azure-key-vault-url "${AZURE_ENDPOINT}" `
+              --azure-key-vault-client-id "${AZURE_CLIENT_ID}" `
+              --azure-key-vault-tenant-id "${AZURE_TENANT_ID}" `
+              --azure-key-vault-client-secret "${AZURE_CLIENT_SECRET}" `
+              --azure-key-vault-certificate "${AZURE_CERT_PROFILE_NAME}" `
+              --file $resolved `
+              --description "PersonalQuery Backend" `
+              --description-url "https://github.com/HASEL-UZH/PersonalQuery"
+          } else {
+            Write-Host "File not found, skipping signing."
+          }
+        shell: pwsh
+        env:
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
 
+      # FIXME
+      - name: Debug SCS_HASH length
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          if [ -z "${SCS_HASH}" ]; then
+            echo "ERROR: SCS_HASH is empty!"
+            exit 1
+          fi
+          echo "SCS_HASH is set. Length: ${#SCS_HASH}"
+        env:
+          SCS_HASH: ${{ secrets.SCS_HASH }}
 
-      #      # macOS: Sign backend executable FIXME
-      #      - name: Sign backend executable (macOS)
-      #        if: startsWith(matrix.os, 'macos')
-      #        working-directory: src/py-backend
-      #        run: |
-      #          SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
-      #          echo "Using signing identity: $SIGN_ID"
-      #
-      #          codesign --deep --force --options runtime --timestamp \
-      #            --sign "$SIGN_ID" \
-      #            dist/pq-backend
-      #        env:
-      #          CSC_LINK: ${{ secrets.CSC_LINK }}
-      #          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      #
-      #      # macOS: Verify signature
-      #      - name: Verify macOS signature
-      #        if: startsWith(matrix.os, 'macos')
-      #        working-directory: src/py-backend
-      #        run: |
-      #          codesign --verify --deep --strict --verbose=2 dist/pq-backend
-      #        env:
-      #          CSC_LINK: ${{ secrets.CSC_LINK }}
-      #          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      - name: Import macOS code signing certificate
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          echo "${CSC_LINK}" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+        env:
+          CSC_LINK: ${{ secrets.SCS_HASH }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
+      - name: Sign backend executable (macOS)
+        if: startsWith(matrix.os, 'macos')
+        working-directory: src/py-backend
+        run: |
+          SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
+          echo "Using signing identity: $SIGN_ID"
+          
+          codesign --deep --force --options runtime --timestamp \
+            --sign "$SIGN_ID" \
+            dist/pq-backend
+        env:
+          CSC_LINK: ${{ secrets.SCS_HASH }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: Verify macOS signature
+        if: startsWith(matrix.os, 'macos')
+        working-directory: src/py-backend
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/pq-backend
+        env:
+          CSC_LINK: ${{ secrets.SCS_HASH }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # ------------------------------------------------
       # Electron build (as in original workflow)
@@ -159,9 +166,9 @@ jobs:
           fi
         env:
           MAC_ARCH_TYPE: ${{ matrix.mac_arch == 'arm64' && 'AppleSilicon' || 'Intel' }}
-          #APPLE_ID: ${{ secrets.APPLE_ID }}
-          #APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          #APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           AZURE_PUBLISHER_NAME: ${{ vars.AZURE_PUBLISHER_NAME }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -169,5 +176,5 @@ jobs:
           AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
           AZURE_CODE_SIGNING_NAME: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
           AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
-          #CSC_LINK: ${{ secrets.CSC_LINK }}
-          #CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
