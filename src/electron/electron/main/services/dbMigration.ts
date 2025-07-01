@@ -16,7 +16,10 @@ export function updateSessionsFromUsageData(db: Database.Database): void {
       question TEXT,
       scale INTEGER,
       response TEXT,
-      skipped BOOLEAN
+      skipped BOOLEAN,
+      created_at datetime,
+      updated_at datetime,
+      deleted_at datetime
     )
   `
   ).run();
