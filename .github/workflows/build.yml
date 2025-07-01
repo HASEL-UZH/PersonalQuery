@@ -96,7 +96,13 @@ jobs:
           SIGN_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n1 | awk -F\" '{print $2}')
           echo "Using signing identity: $SIGN_ID"
 
-          poetry run pyinstaller personalquery-backend.spec \
+          poetry run pyinstaller \
+            src/main.py \
+            --name=pq-backend \
+            --onefile \
+            --icon=../build/icon.ico \
+            --version-file=../build/file_version.txt \
+            --add-data="src/*.py:." \
             --codesign-identity "$SIGN_ID" \
             --osx-entitlements-file ../build/entitlements.mac.plist
         env:
