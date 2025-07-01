@@ -237,32 +237,32 @@ async def run_chat(question: str,
                 f"\n\nCurrent time: {current_time}"
             )
         ))
-        state: State = {
-            "thread_id": chat_id,
-            "messages": messages,
-            "question": question,
-            "title_exist": await title_exists(chat_id),
-            "branch": "",
-            "current_time": current_time,
-            "tables": [],
-            "activities": [],
-            "query": "",
-            "original_question": "",
-            "raw_result": "",
-            "result": [],
-            "answer": "",
-            "top_k": top_k,
-            "last_query": await get_last_query(chat_id),
-            "adjust_query": False,
-            "wants_plot": wants_plot,
-            "answer_detail": answer_detail,
-            "auto_sql": auto_sql,
-            "auto_approve": auto_approve,
-            "plot_code": None,
-            "plot_path": None,
-            "plot_base64": None,
-            "plot_attempts": 0
-        }
+    state: State = {
+        "thread_id": chat_id,
+        "messages": messages,
+        "question": question,
+        "title_exist": await title_exists(chat_id),
+        "branch": "",
+        "current_time": current_time,
+        "tables": [],
+        "activities": [],
+        "query": "",
+        "original_question": "",
+        "raw_result": "",
+        "result": [],
+        "answer": "",
+        "top_k": top_k,
+        "last_query": await get_last_query(chat_id),
+        "adjust_query": False,
+        "wants_plot": wants_plot,
+        "answer_detail": answer_detail,
+        "auto_sql": auto_sql,
+        "auto_approve": auto_approve,
+        "plot_code": None,
+        "plot_path": None,
+        "plot_base64": None,
+        "plot_attempts": 0
+    }
 
     messages.append(HumanMessage(content=question))
 
