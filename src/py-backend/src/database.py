@@ -1,3 +1,6 @@
+import shutil
+import sys
+
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
@@ -5,8 +8,14 @@ import sqlite3
 import os
 from pathlib import Path
 
-APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
-DB_PATH = APPDATA_PATH / "personal-query" / "database.sqlite"
+from helper.env_loader import load_env
+
+load_env()
+
+db_path_str = os.getenv("PERSONALQUERY_DB_PATH")
+if not db_path_str:
+    raise RuntimeError("PERSONALQUERY_DB_PATH is not set in .env")
+DB_PATH = Path(db_path_str)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 _engine = None
@@ -34,3 +43,23 @@ def get_db():
         _db_instance = SQLDatabase(_engine)
 
     return _db_instance
+
+
+def migrate_checkpoint_db(old_path: Path, new_path: Path):
+    if not old_path.exists():
+        return
+    if new_path.exists():
+        return
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(old_path, new_path)
+    old_path.unlink()
+
+
+def get_chat_db_path():
+    if sys.platform == "darwin":
+        new_checkpoint_dir = Path.home() / "Library" / "Application Support" / "personal-query"
+    else:
+        new_checkpoint_dir = Path(os.getenv("APPDATA", Path.home())) / "personal-query"
+    return new_checkpoint_dir / "chat_checkpoints.db"
+
+

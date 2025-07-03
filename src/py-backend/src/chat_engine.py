@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sqlite3
+import sys
 import uuid
 
 import aiosqlite
@@ -24,15 +25,18 @@ from chains.scope_chain import get_scope
 from chains.table_chain import get_tables
 from chains.init_chain import classify_question, generate_title
 from chains.context_chain import give_context
+from database import get_chat_db_path, migrate_checkpoint_db
 from helper.chat_utils import title_exists, give_correct_step
 from helper.env_loader import load_env
 from helper.result_utils import format_result_as_markdown
 from schemas import State, WantsPlot, AnswerDetail
 from llm_registry import LLMRegistry
 
+load_env()
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
-CHECKPOINT_DB_PATH = APPDATA_PATH / "personal-query" / "chat_checkpoints.db"
-DB_PATH = APPDATA_PATH / "personal-query" / "database.sqlite"
+# FIXME TEMPORARY MIGRATION
+OLD_CHECKPOINT_DB_PATH = APPDATA_PATH / "personal-query" / "chat_checkpoints.db"
+CHECKPOINT_DB_PATH = get_chat_db_path()
 
 graph: CompiledGraph
 checkpointer: AsyncSqliteSaver
@@ -42,8 +46,6 @@ logging.basicConfig(level=logging.INFO)
 
 async def initialize():
     global graph, checkpointer
-
-    load_env()
 
     llm_openai = ChatOpenAI(
         model="gpt-4o",
@@ -69,6 +71,10 @@ async def initialize():
     LLMRegistry.register("openai", llm_openai)
     LLMRegistry.register("openai-high-temp", llm_openai_high_temp)
     LLMRegistry.register("openai-mini", llm_openai_mini)
+
+    # FIXME TEMPORARY MIGRATION
+    if sys.platform == "darwin":
+        migrate_checkpoint_db(OLD_CHECKPOINT_DB_PATH, CHECKPOINT_DB_PATH)
 
     async with aiosqlite.connect(str(CHECKPOINT_DB_PATH)) as setup_conn:
         await setup_conn.execute("""

@@ -32,7 +32,7 @@ export class DatabaseService {
   }
 
   public async init(): Promise<void> {
-    let entities: any = [
+    const entities: any = [
       ExperienceSamplingResponseEntity,
       SessionEntity,
       Settings,
@@ -42,7 +42,7 @@ export class DatabaseService {
       WorkDayEntity
     ];
 
-    let options: DataSourceOptions = {
+    const options: DataSourceOptions = {
       type: 'better-sqlite3',
       database: this.dbPath,
       synchronize: true,
@@ -55,6 +55,7 @@ export class DatabaseService {
     try {
       await this.dataSource.initialize();
       LOG.info('Database connection established');
+      await this.writeDbPathEnv();
     } catch (error) {
       LOG.error('Database connection failed', error);
     }
@@ -110,21 +111,22 @@ export class DatabaseService {
     }
   }
 
-  private async runDataInit() {
-    try {
-      const res = await fetch('http://127.0.0.1:8000/initialize-data', {
-        method: 'POST'
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        LOG.error('Backend returned error during cleanup:', errorText);
-      } else {
-        LOG.info('Database modification via Python backend completed.');
-      }
-    } catch (e) {
-      LOG.error('Failed to reach Python backend for cleanup:', e);
+  private async writeDbPathEnv(): Promise<void> {
+    const envPath = path.join(process.resourcesPath, '.env');
+    let existingContent = '';
+    if (fs.existsSync(envPath)) {
+      existingContent = fs.readFileSync(envPath, 'utf-8');
     }
+
+    const lines = existingContent
+      .split('\n')
+      .filter((line) => !line.startsWith('PERSONALQUERY_DB_PATH='))
+      .filter((line) => line.trim().length > 0);
+
+    lines.push(`PERSONALQUERY_DB_PATH=${this.dbPath}`);
+
+    fs.writeFileSync(envPath, lines.join('\n'), 'utf-8');
+    LOG.info(`Updated .env with DB path at ${envPath}`);
   }
 
   public async getDataCoverageScore(): Promise<CoverageScore[]> {

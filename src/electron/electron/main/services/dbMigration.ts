@@ -248,9 +248,7 @@ export function addWindowActivityDurations(db: Database.Database): void {
     }
 
     // Find session containing this record
-    const session = sessionRanges.find(
-      (s) => s.start <= startDt && (!s.end || startDt < s.end)
-    );
+    const session = sessionRanges.find((s) => s.start <= startDt && (!s.end || startDt < s.end));
 
     const candidateEndTimes: Date[] = [];
 
