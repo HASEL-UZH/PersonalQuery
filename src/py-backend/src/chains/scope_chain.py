@@ -19,16 +19,6 @@ def scope_chain(llm: ChatOpenAI) -> RunnableSequence[State, list[str]]:
             | output_parser
     )
 
-
-def get_tables(state: State) -> State:
-    """For LangGraph Orchestration"""
-    if not state["adjust_query"] and state["branch"] == "follow_up":
-        return state
-    llm = LLMRegistry.get("openai")
-    parsed = scope_chain(llm).invoke(state)
-    return state
-
-
 def get_scope(state: State) -> State:
     llm = LLMRegistry.get("openai")
 

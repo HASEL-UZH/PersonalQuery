@@ -77,8 +77,6 @@ def give_correct_step(current_node: str, state: State) -> str:
     branch = state.get('branch')
     title_exist = state.get('title_exist')
     wants_plot = state.get('wants_plot')
-    auto_sql = state.get('auto_sql')
-    auto_approve = state.get('auto_approve')
     if branch == "general_qa":
         return "generate_answer"
 

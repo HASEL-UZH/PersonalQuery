@@ -23,7 +23,6 @@ def give_context(state: State) -> State:
         temp_messages.insert(0, SystemMessage(content=system_prompt))
 
     enriched_question = llm.with_structured_output(Question).invoke(temp_messages)
-    state['original_question'] = state['question']
     state['question'] = enriched_question
 
     return state

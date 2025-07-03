@@ -78,20 +78,19 @@ async def initialize():
                 last_activity TEXT
             )
         """)
-        await setup_conn.commit()
         await setup_conn.execute("""
-                CREATE TABLE IF NOT EXISTS feedback (
-                    id TEXT PRIMARY KEY,
-                    thread_id TEXT,
-                    message_id TEXT,
-                    question TEXT,
-                    message_content TEXT,
-                    data_correct INTEGER,
-                    question_answered INTEGER,
-                    comment TEXT,
-                    created_at TEXT
-                )
-            """)
+            CREATE TABLE IF NOT EXISTS feedback (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT,
+                message_id TEXT,
+                question TEXT,
+                message_content TEXT,
+                data_correct INTEGER,
+                question_answered INTEGER,
+                comment TEXT,
+                created_at TEXT
+            )
+        """)
         await setup_conn.commit()
 
     # Then, create a separate connection just for the checkpointer
@@ -247,7 +246,6 @@ async def run_chat(question: str,
         "tables": [],
         "activities": [],
         "query": "",
-        "original_question": "",
         "raw_result": "",
         "result": [],
         "answer": "",
@@ -265,7 +263,6 @@ async def run_chat(question: str,
     }
 
     messages.append(HumanMessage(content=question))
-
 
     if not auto_approve or not auto_sql:
         interrupt_nodes = ["execute_query"]
@@ -404,7 +401,8 @@ async def get_chat_history(chat_id: str) -> Dict:
         if isinstance(msg, HumanMessage):
             result.append({"role": "human", "content": msg.content})
         elif isinstance(msg, AIMessage):
-            result.append({"role": "ai", "content": msg.content, "additional_kwargs": msg.additional_kwargs, "id": msg.id})
+            result.append(
+                {"role": "ai", "content": msg.content, "additional_kwargs": msg.additional_kwargs, "id": msg.id})
         elif isinstance(msg, SystemMessage):
             result.append({"role": "system", "content": msg.content})
 
@@ -461,15 +459,15 @@ async def store_feedback(chat_id, msg_id, data_correct, question_answered, comme
     try:
         snapshot = await graph.aget_state(config)
         messages = snapshot.values.get("messages", [])
-        question = snapshot.values.get("original_question", "")
-        print(question)
     except Exception:
         return {"error": "Chat not found"}
 
     targetted_msg = None
-    for msg in messages:
+    for i, msg in enumerate(messages):
         if msg.id == msg_id and isinstance(msg, AIMessage):
             targetted_msg = msg
+            if i > 0 and isinstance(messages[i - 1], HumanMessage):
+                question = messages[i - 1].content
             break
     if not targetted_msg:
         return {"error": "Message not found."}
