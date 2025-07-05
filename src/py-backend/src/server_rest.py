@@ -160,36 +160,6 @@ async def submit_feedback(request: Request):
     return status
 
 
-@app.post("/set-env")
-async def set_env(request: Request):
-    data = await request.json()
-
-    # Only expect OPENAI_API_KEY
-    openai_key = data.get("OPENAI_API_KEY", "")
-    if not openai_key:
-        return {"status": "error", "message": "OPENAI_API_KEY is required"}
-
-    # All environment variables to set
-    all_keys = {
-        "OPENAI_API_KEY": openai_key,
-        "LANGSMITH_TRACING": "false",
-        "LANGSMITH_PROJECT": "personalQuery",
-        "LANGSMITH_ENDPOINT": "https://api.smith.langchain.com",
-        "LANGSMITH_API_KEY": "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"
-    }
-
-    # Update environment in memory
-    for key, value in all_keys.items():
-        os.environ[key] = value
-
-    # Write .env file
-    dotenv_path = os.path.join(os.path.dirname(sys.executable), ".env")
-    with open(dotenv_path, "w") as f:
-        for key, value in all_keys.items():
-            f.write(f"{key}={value}\n")
-
-    return {"status": "ok"}
-
 @app.get("/health")
 def health_check():
     return {"status": "ok"}

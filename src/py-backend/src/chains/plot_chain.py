@@ -3,11 +3,11 @@ from pathlib import Path
 import platform
 from langchain import hub
 
+from database import get_app_data_dir
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry
 from schemas import State, PythonOutput, PlotOption
 
-import os
 import uuid
 import base64
 import matplotlib.pyplot as plt
@@ -23,8 +23,8 @@ prompt_template_auto = hub.pull("auto-plot-decision")
 prompt_template_create = hub.pull("create-plot-py")
 prompt_template_create_again = hub.pull("create-plot-py-again")
 
-APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
-PLOT_DIR = APPDATA_PATH / "personal-query" / "plots"
+APPDATA_PATH = get_app_data_dir()
+PLOT_DIR = APPDATA_PATH / "plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -119,7 +119,6 @@ def run_plot_script(state: State) -> State:
             mpl_style(dark=True)
         except Exception as e:
             print("WARNING: Could not apply qbstyles:", e)
-
 
     except Exception as e:
         state["plot_error"] = f"Font setup failed: {e}"

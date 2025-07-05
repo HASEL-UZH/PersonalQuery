@@ -63,3 +63,10 @@ def get_chat_db_path():
     return new_checkpoint_dir / "chat_checkpoints.db"
 
 
+def get_app_data_dir() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "personal-query"
+    else:
+        return Path(os.getenv("APPDATA", Path.home())) / "personal-query"
+
+

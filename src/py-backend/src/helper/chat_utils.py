@@ -5,10 +5,11 @@ from typing import Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompt_values import ChatPromptValue
 
+from database import get_chat_db_path
 from schemas import WantsPlot, State
 
 APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
-CHECKPOINT_DB_PATH = APPDATA_PATH / "personal-query" / "chat_checkpoints.db"
+CHECKPOINT_DB_PATH = get_chat_db_path()
 
 
 async def get_next_thread_id() -> str:

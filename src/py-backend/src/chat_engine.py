@@ -319,6 +319,7 @@ async def run_chat(question: str,
                 return {}
         else:
             await resume_stream(chat_id, [], websocket)
+            return {}
 
     return final_msg
 

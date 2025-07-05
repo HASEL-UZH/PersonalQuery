@@ -1,7 +1,5 @@
 import logging
-import os
 import sqlite3
-from pathlib import Path
 
 from langchain import hub
 from langchain_core.messages import SystemMessage
@@ -9,6 +7,7 @@ from langchain_core.output_parsers.openai_tools import PydanticToolsParser
 from langchain_core.prompt_values import ChatPromptValue
 from langchain_openai import ChatOpenAI
 
+from database import get_chat_db_path
 from helper.env_loader import load_env
 from llm_registry import LLMRegistry
 from schemas import QuestionType, State
@@ -18,8 +17,7 @@ output_parser = PydanticToolsParser(tools=[QuestionType])
 prompt_template = hub.pull("classify_question")
 prompt_template_title = hub.pull("generate_title")
 
-APPDATA_PATH = Path(os.getenv("APPDATA", Path.home()))
-CHECKPOINT_DB_PATH = APPDATA_PATH / "personal-query" / "chat_checkpoints.db"
+CHECKPOINT_DB_PATH = get_chat_db_path()
 
 
 def classify_chain(llm: ChatOpenAI):
