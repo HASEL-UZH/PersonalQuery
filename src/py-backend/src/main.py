@@ -1,6 +1,8 @@
 import signal
 import logging
 import asyncio
+import sys
+
 from uvicorn import Config, Server
 from server_rest import app
 
@@ -20,6 +22,8 @@ def handle_exit(signum, frame):
     if server:
         # Graceful shutdown
         server.should_exit = True
+    loop = asyncio.get_event_loop()
+    loop.stop()
 
 
 async def main():
@@ -36,6 +40,9 @@ async def main():
 
     # Start server. This coroutine completes when server.should_exit becomes True
     await server.serve()
+
+    logging.info("Server shutdown complete. Exiting process.")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
