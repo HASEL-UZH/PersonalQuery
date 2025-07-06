@@ -68,7 +68,13 @@ function startBackend() {
   const newBackend = spawn(backendExePath, {
     cwd: path.dirname(backendExePath),
     detached: true,
-    stdio: "ignore"
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  newBackend.stdout.on('data', (data) => {
+    console.log(`[Backend] ${data}`);
+  });
+  newBackend.stderr.on('data', (data) => {
+    console.error(`[Backend] ${data}`);
   });
   newBackend.unref();
   newBackend.stdout.on('data', (data) => {
