@@ -582,11 +582,17 @@ onMounted(async () => {
         class="flex flex-col items-center justify-center px-4 text-center"
       >
         <h3 class="mb-4 text-lg font-semibold">Quick Start</h3>
-        <ul class="flex flex-wrap gap-10">
+        <ul class="flex flex-wrap gap-2">
           <li v-for="q in randomSuggestedQuestions" :key="q">
             <button
               :key="q"
-              :class="['btn', selectedQuestion === q ? 'btn-primary' : 'btn-outline']"
+              :class="[
+                'btn',
+                'w-auto',
+                'px-3',
+                'text-sm',
+                selectedQuestion === q ? 'btn-primary' : 'btn-outline'
+              ]"
               @click="onSelectQuestion(q)"
             >
               {{ q }}
