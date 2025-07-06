@@ -22,7 +22,7 @@ import { Settings } from './entities/Settings';
 import { UsageDataService } from './services/UsageDataService';
 import { UsageDataEventType } from '../enums/UsageDataEventType.enum';
 import { WorkScheduleService } from './services/WorkScheduleService';
-import { spawn, exec } from 'child_process';
+import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SessionService } from './services/SessionService';
@@ -93,20 +93,29 @@ function stopBackend(): void {
   if (!backendProcess) {
     return;
   }
-  const pgid = -backendProcess.pid;
-  LOG.info(`Sending SIGKILL to backend process group PGID: ${pgid}`);
 
-  treeKill(pgid, "SIGKILL", (err) => {
-    if (err) {
-      LOG.error(`Error sending SIGKILL: ${err}`);
-    } else {
-      LOG.info(`SIGKILL successfully sent to backend process group.`);
+  if (process.platform === 'win32') {
+    LOG.info(`Using tree-kill on Windows to stop backend PID: ${backendProcess.pid}`);
+    treeKill(backendProcess.pid, 'SIGKILL', (err) => {
+      if (err) {
+        LOG.error(`Error sending SIGKILL with tree-kill: ${err}`);
+      } else {
+        LOG.info(`SIGKILL successfully sent via tree-kill.`);
+      }
+    });
+  } else {
+    const pgid = -backendProcess.pid;
+    LOG.info(`Sending SIGKILL to backend process group PGID: ${pgid}`);
+    try {
+      process.kill(pgid, 'SIGKILL');
+      LOG.info(`SIGKILL successfully sent to process group.`);
+    } catch (err) {
+      LOG.error(`Error sending SIGKILL to process group: ${err}`);
     }
-  });
+  }
 
   backendProcess = null;
 }
-
 
 globalThis.backendProcess = backendProcess;
 
