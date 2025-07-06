@@ -229,7 +229,7 @@ app.whenReady().then(async () => {
       LOG.debug(
         `Onboarding shown: ${settings.onboardingShown}, hasAccessibilityAndScreenRecordingPermission: ${macOSHasAccessibilityAndScreenRecordingPermission()}, creating onboarding window...`
       );
-      //await windowService.createOnboardingWindow(); FIXME
+      await windowService.createOnboardingWindow();
       settings.onboardingShown = true;
       await settings.save();
 
