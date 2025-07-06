@@ -66,8 +66,11 @@ function startBackend() {
   const backendExePath = path.join(process.resourcesPath, backendBinary);
   LOG.info(`Launching backend at: ${backendExePath}`);
   const newBackend = spawn(backendExePath, {
-    cwd: path.dirname(backendExePath)
+    cwd: path.dirname(backendExePath),
+    detached: true,
+    stdio: "ignore"
   });
+  newBackend.unref();
   newBackend.stdout.on('data', (data) => {
     LOG.info(`[Backend STDOUT] ${data.toString().trim()}`);
   });
@@ -87,7 +90,7 @@ function stopBackend(): void {
   const pid = backendProcess.pid;
   LOG.info(`Sending SIGINT to backend process with PID: ${pid}`);
 
-  treeKill(pid, "SIGINT", (err) => {
+  treeKill(-pid, "SIGINT", (err) => {
     if (err) {
       LOG.error(`Error sending SIGINT: ${err}`);
       return;
@@ -97,7 +100,7 @@ function stopBackend(): void {
       try {
         process.kill(pid, 0);
         LOG.warn(`Backend PID ${pid} still alive, sending SIGKILL`);
-        treeKill(pid, "SIGKILL", (killErr) => {
+        treeKill(pid, 'SIGKILL', (killErr) => {
           if (killErr) {
             LOG.error(`Error sending SIGKILL: ${killErr}`);
           } else {
