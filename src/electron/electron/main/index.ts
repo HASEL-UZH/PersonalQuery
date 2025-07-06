@@ -68,7 +68,8 @@ function startBackend() {
   const newBackend = spawn(backendExePath, {
     cwd: path.dirname(backendExePath),
     detached: true,
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true
   });
   newBackend.stdout.on('data', (data) => {
     console.log(`[Backend] ${data}`);
@@ -76,7 +77,6 @@ function startBackend() {
   newBackend.stderr.on('data', (data) => {
     console.error(`[Backend] ${data}`);
   });
-  newBackend.unref();
   newBackend.stdout.on('data', (data) => {
     LOG.info(`[Backend STDOUT] ${data.toString().trim()}`);
   });
@@ -93,34 +93,20 @@ function stopBackend(): void {
   if (!backendProcess) {
     return;
   }
-  const pid = backendProcess.pid;
-  LOG.info(`Sending SIGINT to backend process with PID: ${pid}`);
+  const pgid = -backendProcess.pid;
+  LOG.info(`Sending SIGKILL to backend process group PGID: ${pgid}`);
 
-  treeKill(-pid, "SIGINT", (err) => {
+  treeKill(pgid, "SIGKILL", (err) => {
     if (err) {
-      LOG.error(`Error sending SIGINT: ${err}`);
-      return;
+      LOG.error(`Error sending SIGKILL: ${err}`);
+    } else {
+      LOG.info(`SIGKILL successfully sent to backend process group.`);
     }
-
-    setTimeout(() => {
-      try {
-        process.kill(pid, 0);
-        LOG.warn(`Backend PID ${pid} still alive, sending SIGKILL`);
-        treeKill(pid, 'SIGKILL', (killErr) => {
-          if (killErr) {
-            LOG.error(`Error sending SIGKILL: ${killErr}`);
-          } else {
-            LOG.info(`SIGKILL successfully sent to PID ${pid}`);
-          }
-        });
-      } catch (e) {
-        LOG.info(`Backend PID ${pid} has already exited.`);
-      }
-    }, 2000);
   });
 
   backendProcess = null;
 }
+
 
 globalThis.backendProcess = backendProcess;
 
